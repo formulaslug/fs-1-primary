@@ -15,7 +15,8 @@
  */
 static constexpr CANConfig cancfg = {
   CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP,
-  CAN_BTR_SJW(0) | CAN_BTR_TS2(5) | CAN_BTR_TS1(4) | CAN_BTR_BRP(11)
+  CAN_BTR_LBKM | CAN_BTR_SJW(0) | CAN_BTR_TS2(5) | CAN_BTR_TS1(4) |
+  CAN_BTR_BRP(11)
 };
 
 // RX thread
@@ -32,7 +33,7 @@ static THD_FUNCTION(can_rx, p) {
       continue;
     while (canReceive(&CAND1, CAN_ANY_MAILBOX, &rxmsg, TIME_IMMEDIATE) == MSG_OK) {
       /* Process message.*/
-      palTogglePad(IOPORT3, GPIOC_LED);
+      palToggleLine(LINE_LED_GREEN);
     }
   }
   chEvtUnregister(&CAND1.rxfull_event, &el);
