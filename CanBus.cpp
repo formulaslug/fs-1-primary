@@ -1,9 +1,10 @@
 // Copyright (c) Formula Slug 2016. All Rights Reserved.
 
-#include "CANopen.h"
+#include "CanBus.h"
 
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 /* baudrate = 36MHz / ((1 + BRP) * (3 + TS1 + TS2))
  * See STM32F103xx reference manual, 24.7.7 for info on CAN_BTR register.
@@ -17,7 +18,7 @@
  *   1   1.5M
  *   0     3M
  */
-constexpr CANConfig MakeConfig(CANBaudRate baud, bool loopback) {
+constexpr CANConfig MakeConfig(CanBusBaudRate baud, bool loopback) {
   uint32_t btr = CAN_BTR_SJW(0) | CAN_BTR_TS2(5) | CAN_BTR_TS1(4);
 
   if (loopback) {
@@ -25,30 +26,30 @@ constexpr CANConfig MakeConfig(CANBaudRate baud, bool loopback) {
   }
 
   switch (baud) {
-  case CANBaudRate::k125k:
-    btr |= CAN_BTR_BRP(239);
-    break;
-  case CANBaudRate::k250k:
-    btr |= CAN_BTR_BRP(11);
-    break;
-  case CANBaudRate::k500k:
-    btr |= CAN_BTR_BRP(5);
-    break;
-  case CANBaudRate::k1M:
-    btr |= CAN_BTR_BRP(2);
-    break;
-  case CANBaudRate::k1M5:
-    btr |= CAN_BTR_BRP(1);
-    break;
-  case CANBaudRate::k3M:
-    btr |= CAN_BTR_BRP(0);
-    break;
+    case CanBusBaudRate::k125k:
+      btr |= CAN_BTR_BRP(239);
+      break;
+    case CanBusBaudRate::k250k:
+      btr |= CAN_BTR_BRP(11);
+      break;
+    case CanBusBaudRate::k500k:
+      btr |= CAN_BTR_BRP(5);
+      break;
+    case CanBusBaudRate::k1M:
+      btr |= CAN_BTR_BRP(2);
+      break;
+    case CanBusBaudRate::k1M5:
+      btr |= CAN_BTR_BRP(1);
+      break;
+    case CanBusBaudRate::k3M:
+      btr |= CAN_BTR_BRP(0);
+      break;
   }
 
   return {CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP, btr};
 }
 
-CANopen::CANopen(uint32_t id, CANBaudRate baud, bool loopback) {
+CanBus::CanBus(uint32_t id, CanBusBaudRate baud, bool loopback) {
   m_id = id;
 
   CANConfig config = MakeConfig(baud, loopback);
@@ -57,25 +58,30 @@ CANopen::CANopen(uint32_t id, CANBaudRate baud, bool loopback) {
   palWriteLine(LINE_LED_GREEN, PAL_LOW);
 }
 
-CANopen::~CANopen() { canStop(&CAND1); }
+CanBus::~CanBus() { canStop(&CAND1); }
 
-void CANopen::setFilters(std::initializer_list<uint32_t> filters) {
-  CANFilter filterArray[filters.size()];
+void CanBus::setFilters(std::initializer_list<uint32_t> filters) {
+  std::vector<CANFilter> filterArray;
+  CANFilter temp;
 
   size_t i = 0;
   for (auto filter : filters) {
-    filterArray[i].mode = 1;  // mask mode
-    filterArray[i].scale = 1;  // 32 bits mode
-    filterArray[i].assignment = 0;  // must be 0 in this version of the driver
+    temp.mode = 1;        // mask mode
+    temp.scale = 1;       // 32 bits mode
+    temp.assignment = 0;  // must be 0 in this version of the driver
 
-    // TODO: filters currently do nothing
-    filterArray[i].register1 = filter;
+    temp.register1 = filter;
+
+    filterArray.push_back(temp);
 
     i++;
   }
+
+  // TODO: filters currently do nothing
+  static_cast<void>(filterArray);
 }
 
-bool CANopen::send(uint64_t data) {
+bool CanBus::send(uint64_t data) {
   static CANTxFrame msg;
 
   msg.IDE = CAN_IDE_EXT;
@@ -88,7 +94,7 @@ bool CANopen::send(uint64_t data) {
   return send(msg);
 }
 
-bool CANopen::send(const CANTxFrame& msg) {
+bool CanBus::send(const CANTxFrame& msg) {
   if (canTransmit(&CAND1, CAN_ANY_MAILBOX, &msg, MS2ST(100)) == MSG_OK) {
     palWriteLine(LINE_LED_GREEN, PAL_HIGH);
     return true;
@@ -98,11 +104,11 @@ bool CANopen::send(const CANTxFrame& msg) {
   }
 }
 
-bool CANopen::recv(CANRxFrame& msg) {
+bool CanBus::recv(CANRxFrame& msg) {
   return canReceive(&CAND1, CAN_ANY_MAILBOX, &msg, TIME_IMMEDIATE) == MSG_OK;
 }
 
-void CANopen::printTxMessage(const CANTxFrame& msg) const {
+void CanBus::printTxMessage(const CANTxFrame& msg) const {
   std::printf("[CAN TX] COB-ID:");
 
   // Pad left of shorter ID with spaces
@@ -124,7 +130,7 @@ void CANopen::printTxMessage(const CANTxFrame& msg) const {
   std::printf("\n");
 }
 
-void CANopen::printRxMessage(const CANRxFrame& msg) const {
+void CanBus::printRxMessage(const CANRxFrame& msg) const {
   std::printf("[CAN RX] COB-ID:");
 
   // Pad left of shorter ID with spaces
@@ -147,11 +153,10 @@ void CANopen::printRxMessage(const CANRxFrame& msg) const {
 }
 
 /**
- * @desc Transmits all enqueued messages, in g_canTxQueue, of type
- *       CAN_message_t. Enqueue them onto the transmit logs queue after so that
- *       they can be printed
+ * @desc Transmits all enqueued messages. Enqueue them onto the transmit logs
+ *       queue after so that they can be printed
  */
-void CANopen::processTxMessages() {
+void CanBus::processTxMessages() {
   while (m_txQueue.Size() > 0) {
     // write message
     send(m_txQueue[0]);
@@ -165,7 +170,7 @@ void CANopen::processTxMessages() {
 /**
  * @desc Enqueue any messages apearing on the CAN bus
  */
-void CANopen::processRxMessages() {
+void CanBus::processRxMessages() {
   static CANRxFrame rxMessageTmp;
   while (recv(rxMessageTmp)) {
     m_rxQueue.PushBack(rxMessageTmp);
@@ -178,7 +183,7 @@ void CANopen::processRxMessages() {
 /**
  * @desc Prints over serial all messages currently in the tx logs queue
  */
-void CANopen::printTxAll() {
+void CanBus::printTxAll() {
   static CANTxFrame queueMessage;
   queueMessage = m_txLogsQueue.PopFront();
   while (queueMessage.EID) {
@@ -192,7 +197,7 @@ void CANopen::printTxAll() {
 /**
  * @desc Prints over serial all messages currently in the rx queue
  */
-void CANopen::printRxAll() {
+void CanBus::printRxAll() {
   static CANRxFrame msg;
   msg = m_rxLogsQueue.PopFront();
   while (msg.EID) {
@@ -206,22 +211,22 @@ void CANopen::printRxAll() {
 /**
  * @desc Enqueues a packaged message to be transmitted over the CAN bus
  */
-void CANopen::queueTxMessage(CANTxFrame msg) { m_txQueue.PushBack(msg); }
+void CanBus::queueTxMessage(CANTxFrame msg) { m_txQueue.PushBack(msg); }
 
 /**
  * @desc Dequeues a packaged message to be unpacked and used
  * @param msg The message at the front of the rx queue
  */
-CANRxFrame CANopen::dequeueRxMessage() { return m_rxQueue.PopFront(); }
+CANRxFrame CanBus::dequeueRxMessage() { return m_rxQueue.PopFront(); }
 
 /**
  * @desc Gets the current size of the tx queue
  * @return The size
  */
-uint8_t CANopen::txQueueSize() { return m_txQueue.Size(); }
+uint8_t CanBus::txQueueSize() { return m_txQueue.Size(); }
 
 /**
  * @desc Gets the current size of the rx queue
  * @return The size
  */
-uint8_t CANopen::rxQueueSize() { return m_rxQueue.Size(); }
+uint8_t CanBus::rxQueueSize() { return m_rxQueue.Size(); }

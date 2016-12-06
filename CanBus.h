@@ -5,10 +5,9 @@
 #include <initializer_list>
 
 #include "CircularBuffer.h"
-#include "ch.h"
 #include "hal.h"
 
-enum class CANBaudRate : uint8_t {
+enum class CanBusBaudRate : uint8_t {
   k125k,  // 125 kHz
   k250k,  // 250 kHz
   k500k,  // 500 kHz
@@ -17,10 +16,10 @@ enum class CANBaudRate : uint8_t {
   k3M     // 3 MHz
 };
 
-class CANopen {
+class CanBus {
  public:
-  CANopen(uint32_t id, CANBaudRate baud, bool loopback);
-  virtual ~CANopen();
+  CanBus(uint32_t id, CanBusBaudRate baud, bool loopback);
+  virtual ~CanBus();
 
   void setFilters(std::initializer_list<uint32_t> filters);
   bool send(uint64_t data);
@@ -34,7 +33,7 @@ class CANopen {
   CANRxFrame dequeueRxMessage();
   uint8_t rxQueueSize();
 
-  // listen to CAN bus and Enqueue/Dequeue messages accordingly
+  // listen to CanBus bus and Enqueue/Dequeue messages accordingly
   void processTxMessages();
   void processRxMessages();
 
@@ -44,7 +43,7 @@ class CANopen {
   void printRxAll();
 
  private:
-  // circular buffers to hold CAN_message_t instances
+  // circular buffers to hold CanBus_message_t instances
   CircularBuffer<CANTxFrame> m_txQueue{10};
   CircularBuffer<CANTxFrame> m_txLogsQueue{10};
   CircularBuffer<CANRxFrame> m_rxQueue{10};
@@ -52,7 +51,7 @@ class CANopen {
 
   uint32_t m_id = 0;
 
-  // print CAN message to serial console
+  // print CanBus message to serial console
   void printTxMessage(const CANTxFrame& msg) const;
   void printRxMessage(const CANRxFrame& msg) const;
 };

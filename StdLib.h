@@ -2,14 +2,9 @@
 
 #pragma once
 
-#include <cstdio>
-
 #ifdef __cplusplus
-namespace std {
-extern "C" void* memcpy(void* dst, const void* src, size_t count);
-}
 
-#include <stdlib.h>
+#include <stddef.h>
 
 void* operator new(size_t size);
 void* operator new[](size_t size);
@@ -24,6 +19,12 @@ extern "C" int __cxa_guard_acquire(__guard*);
 extern "C" void __cxa_guard_release(__guard*);
 extern "C" void __cxa_guard_abort(__guard*);
 extern "C" void __cxa_pure_virtual(void);
-#else
-extern void* memcpy(void* dst, const void* src, size_t count);
+#endif  // __cplusplus
+
+#ifdef __cplusplus
+namespace std {
+#endif  // __cplusplus
+int printf(const char* format, ...);
+#ifdef __cplusplus
+}  // std
 #endif  // __cplusplus

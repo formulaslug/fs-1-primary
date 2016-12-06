@@ -1,10 +1,8 @@
 // Copyright (c) Formula Slug 2016. All Rights Reserved.
 
-#include "CANopenPDO.h"
+#include "CanOpenPdo.h"
 
-#include <cstdlib>
-
-#include "StdLib.h"
+#include <cstring>
 
 HeartbeatMessage::HeartbeatMessage(uint32_t id) {
   IDE = CAN_IDE_EXT;
