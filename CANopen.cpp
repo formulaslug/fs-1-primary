@@ -48,10 +48,10 @@ constexpr CANConfig MakeConfig(CANBaudRate baud, bool loopback) {
   return {CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP, btr};
 }
 
-CANopen::CANopen(uint32_t id, CANBaudRate baud) {
+CANopen::CANopen(uint32_t id, CANBaudRate baud, bool loopback) {
   m_id = id;
 
-  CANConfig config = MakeConfig(baud, true);
+  CANConfig config = MakeConfig(baud, loopback);
   canStart(&CAND1, &config);
 
   palWriteLine(LINE_LED_GREEN, PAL_LOW);

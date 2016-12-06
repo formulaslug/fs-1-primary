@@ -19,7 +19,7 @@ enum class CANBaudRate : uint8_t {
 
 class CANopen {
  public:
-  CANopen(uint32_t id, CANBaudRate baud);
+  CANopen(uint32_t id, CANBaudRate baud, bool loopback);
   virtual ~CANopen();
 
   void setFilters(std::initializer_list<uint32_t> filters);

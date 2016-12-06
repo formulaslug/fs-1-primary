@@ -44,7 +44,7 @@ int main() {
   chSysInit();
 
   // Activate CAN driver 1 (PA11 = CANRX, PA12 = CANTX)
-  CANopen canBus(0x680, CANBaudRate::k250k);
+  CANopen canBus(0x680, CANBaudRate::k250k, false);
 
   // Start transmitter thread
   static THD_WORKING_AREA(can_rx_wa, 256);
