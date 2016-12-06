@@ -4,6 +4,7 @@
 *.elf
 *.hex
 *.list
+*.log
 *.lst
 *.map
 *.o

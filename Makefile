@@ -218,5 +218,10 @@ RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
 include $(RULESPATH)/rules.mk
 
 .PHONY: upload
-upload:
+upload: all
 	openocd -f board/st_nucleo_f3.cfg -c "program build/$(PROJECT).elf verify reset exit"
+
+.PHONY: debug
+debug: all
+	$(RM) openocd.log
+	arm-none-eabi-gdb -x .gdbinit build/$(PROJECT).elf
