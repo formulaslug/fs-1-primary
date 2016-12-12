@@ -80,15 +80,11 @@ int main() {
       canBus.printRxAll();
     }
 
-    // (TEMPORARY) Update all analog inputs readings. In production, this will
-    // go in the fsm
-    // TODO: clean this input and give a leeway of 3 or 4 before setting the new
-    // value
-    /*vehicle.dynamics.throttleVoltage =
-        analogRead(analogInputPins[kThrottleVoltage]);*/
+#if 0
+    vehicle.dynamics.throttleVoltage =
+        analogRead(analogInputPins[kThrottleVoltage]);
 
     // Vehicle's main state machine (FSM)
-#if 0
     switch (vehicle.state) {
       case kLVStartup:
         // Perform kLVStartup functions HERE

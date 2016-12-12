@@ -1,12 +1,12 @@
 // Copyright (c) Formula Slug 2016. All Rights Reserved.
 
 #include "StdLib.h"
+#include "hal.h"  // NOLINT
 
 #include <cstdarg>
 #include <cstdlib>
 
 #include "ch.h"
-#include "hal.h"
 #include "chprintf.h"
 
 namespace std {
@@ -65,4 +65,4 @@ int printf(const char* format, ...) {
 
   return size;
 }
-}  // std
+}  // namespace std

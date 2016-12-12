@@ -1,4 +1,6 @@
-#include <avr_emulation.h>
+// Copyright (c) Formula Slug 2016. All Rights Reserved.
+
+#pragma once
 
 template <uint8_t DebounceCount>
 ButtonTracker<DebounceCount>::ButtonTracker(uint32_t pin, bool logicHigh) {

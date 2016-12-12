@@ -5,6 +5,7 @@ cExtensions {
 
 cppHeaderExtensions {
   hpp
+  inc
 }
 
 cppSrcExtensions {
@@ -27,6 +28,7 @@ modifiableFolderExclude {
 }
 
 modifiableFileExclude {
+  StdLib\.cpp$
   chconf\.h$
   halconf\.h$
   mcuconf\.h$
