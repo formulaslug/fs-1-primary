@@ -2,9 +2,17 @@
 
 #include "thread.h"
 
-thread& thread::operator=(thread&& rhs) {
+thread::thread(thread&& rhs) noexcept {
+  *this = std::move(rhs);
+}
+
+thread& thread::operator=(thread&& rhs) noexcept {
+  if (rhs.m_joinable == false) {
+    chSysHalt("Can't move detached thread");
+  }
+
   m_thread = rhs.m_thread;
-  m_joinable = rhs.m_joinable.load();
+  m_joinable = true;
   rhs.m_thread = nullptr;
   rhs.m_joinable = false;
 

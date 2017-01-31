@@ -12,9 +12,10 @@
 class thread {
  public:
   thread() = default;
+  thread(thread&& rhs) noexcept;
   thread(const thread&) = delete;
   thread& operator=(const thread&) = delete;
-  thread& operator=(thread&& rhs);
+  thread& operator=(thread&& rhs) noexcept;
 
   template <class Function, class... Args>
   thread(tprio_t priority, Function&& function, Args&&... args);
