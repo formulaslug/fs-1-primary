@@ -1,4 +1,4 @@
-// Copyright (c) Formula Slug 2016-2017. All Rights Reserved.
+// Copyright (c) 2016-2017 Formula Slug. All Rights Reserved.
 
 #include <array>
 #include <mutex>
