@@ -72,7 +72,7 @@ int main() {
 
   while (1) {
     {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+      std::lock_guard lock(canBusMut);
 
       // print all transmitted messages
       canBus.printTxAll();
@@ -170,9 +170,9 @@ int main() {
 void heartbeatThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
   while (1) {
     // enqueue heartbeat message to g_canTxQueue
-    const HeartbeatMessage heartbeatMessage(kCobid_node3Heartbeat);
+    const HeartbeatMessage heartbeatMessage(kCobIdNode3Heartbeat);
     {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+      std::lock_guard lock(canBusMut);
       canBus.queueTxMessage(heartbeatMessage);
     }
 
@@ -195,7 +195,7 @@ void inputProcThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
     // enqueue throttle voltage periodically as well
     const ThrottleMessage throttleMessage(65536 * throttle, driveButton);
     {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+      std::lock_guard lock(canBusMut);
       canBus.queueTxMessage(throttleMessage);
     }
 
@@ -214,7 +214,7 @@ void canRxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
       continue;
     }
     {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+      std::lock_guard lock(canBusMut);
       canBus.processRxMessages();
     }
   }
@@ -227,7 +227,7 @@ void canTxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
 
   while (true) {
     {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+      std::lock_guard lock(canBusMut);
       canBus.send(0x00FF00FF55AA55AA);
       canBus.processTxMessages();
     }

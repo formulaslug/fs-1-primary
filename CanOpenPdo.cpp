@@ -16,7 +16,7 @@ HeartbeatMessage::HeartbeatMessage(uint32_t id) {
 
 ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch) {
   IDE = CAN_IDE_EXT;
-  EID = kCobid_TPDO5;
+  EID = kCobIdTPDO5;
   RTR = CAN_RTR_DATA;
   DLC = 8;
 
