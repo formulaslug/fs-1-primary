@@ -18,7 +18,7 @@ constexpr uint32_t kCobIdS2p = 0x014;
 constexpr uint32_t kPayloadHeartbeat = 0x1;
 
 struct HeartbeatMessage : public CANTxFrame {
-  HeartbeatMessage(uint32_t id);
+  explicit HeartbeatMessage(uint32_t id);
 };
 
 struct ThrottleMessage : public CANTxFrame {
