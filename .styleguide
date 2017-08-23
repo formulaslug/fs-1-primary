@@ -1,49 +1,19 @@
-cExtensions {
-  c
-  h
+cppHeaderFileInclude {
+  \.h$
+  \.hpp$
+  \.inc$
 }
 
-cppHeaderExtensions {
-  hpp
-  inc
-}
-
-cppSrcExtensions {
-  cpp
-}
-
-otherExtensions {
-}
-
-genFolderExclude {
-}
-
-genFileExclude {
-}
-
-modifiableFolderExclude {
-  build
-  ChibiOS
+cppSrcFileInclude {
+  \.cpp$
 }
 
 modifiableFileExclude {
+  ChibiOS/
+  build/
   StdLib\.cpp$
+  StdLib\.h$
   chconf\.h$
   halconf\.h$
   mcuconf\.h$
-}
-
-includeRelated {
-}
-
-includeCSys {
-}
-
-includeCppSys {
-}
-
-includeOtherLibs {
-}
-
-includeProject {
 }

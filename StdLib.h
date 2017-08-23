@@ -4,7 +4,7 @@
 
 #ifdef __cplusplus
 
-#include <stddef.h>
+#include <cstddef>
 
 void* operator new(size_t size);
 void* operator new[](size_t size);

@@ -2,6 +2,8 @@
 
 #include "thread.h"
 
+#include <utility>
+
 thread::thread(thread&& rhs) noexcept { *this = std::move(rhs); }
 
 thread& thread::operator=(thread&& rhs) noexcept {
