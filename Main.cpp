@@ -9,6 +9,7 @@
 #include "ch.hpp"
 #include "hal.h"
 #include "thread.h"
+#include "pinconf.h"
 
 /**
  * If the range is ordered as (min, max), minimum input values map to 0.
@@ -39,19 +40,19 @@ int main() {
   chSysInit();
 
   // Configure input pins
-  palSetPadMode(GPIOA, GPIOA_ARD_A1, PAL_MODE_INPUT);
-  palSetPadMode(GPIOA, GPIOA_ARD_A3, PAL_MODE_INPUT);
-  palSetPadMode(GPIOA, GPIOA_ARD_A0, PAL_MODE_INPUT);
-  palSetPadMode(GPIOA, GPIOA_ARD_D2, PAL_MODE_INPUT_PULLUP);
-  palSetPadMode(GPIOB, GPIOB_ARD_D3, PAL_MODE_INPUT_PULLUP);
+  palSetPadMode(ARBITRARY_PORT_1, ARBITRARY_PIN_1, PAL_MODE_INPUT);
+  palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT);
+  palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT);
+  palSetPadMode(ARBITRARY_PORT_2, ARBITRARY_PIN_2, PAL_MODE_INPUT_PULLUP);
+  palSetPadMode(ARBITRARY_PORT_3, ARBITRARY_PIN_3, PAL_MODE_INPUT_PULLUP);
 
   // Turn off startup sound
-  palSetPadMode(GPIOB, GPIOB_ARD_D4, PAL_MODE_OUTPUT_PUSHPULL);
-  palWritePad(GPIOB, GPIOB_ARD_D4, PAL_LOW);
+  palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+  palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_LOW);
 
   // Turn off brake light
-  palSetPadMode(GPIOB, GPIOB_ARD_D5, PAL_MODE_OUTPUT_PUSHPULL);
-  palWritePad(GPIOB, GPIOB_ARD_D5, PAL_LOW);
+  palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+  palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_LOW);
 
   Vehicle vehicle;
 

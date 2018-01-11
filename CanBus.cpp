@@ -55,7 +55,7 @@ CanBus::CanBus(uint32_t id, CanBusBaudRate baud, bool loopback) {
   CANConfig config = MakeConfig(baud, loopback);
   canStart(&CAND1, &config);
 
-  palWriteLine(LINE_LED_GREEN, PAL_LOW);
+  palWriteLine(CAN_STATUS_LINE_LED, PAL_LOW);
 }
 
 CanBus::~CanBus() { canStop(&CAND1); }
@@ -96,10 +96,10 @@ bool CanBus::send(uint64_t data) {
 
 bool CanBus::send(const CANTxFrame& msg) {
   if (canTransmit(&CAND1, CAN_ANY_MAILBOX, &msg, MS2ST(100)) == MSG_OK) {
-    palWriteLine(LINE_LED_GREEN, PAL_HIGH);
+    palWriteLine(CAN_STATUS_LINE_LED, PAL_HIGH);
     return true;
   } else {
-    palWriteLine(LINE_LED_GREEN, PAL_LOW);
+    palWriteLine(CAN_STATUS_LINE_LED, PAL_LOW);
     return false;
   }
 }
