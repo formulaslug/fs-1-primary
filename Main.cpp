@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 Formula Slug. All Rights Reserved.
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
 
 #include <array>
 #include <mutex>
@@ -8,8 +8,8 @@
 #include "Vehicle.h"
 #include "ch.hpp"
 #include "hal.h"
-#include "thread.h"
 #include "pinconf.h"
+#include "thread.h"
 
 /**
  * If the range is ordered as (min, max), minimum input values map to 0.

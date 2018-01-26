@@ -16,4 +16,5 @@ modifiableFileExclude {
   chconf\.h$
   halconf\.h$
   mcuconf\.h$
+  mcuconf-f3\.h$
 }

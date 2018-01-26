@@ -10,10 +10,18 @@
 #include "chprintf.h"
 
 namespace std {
-void __throw_bad_alloc() { printf("Unable to allocate memory"); }
+void __throw_bad_alloc() {
+#if (HAL_USE_SERIAL == TRUE)
+  printf("Unable to allocate memory");
+#endif
+}
 
 void __throw_length_error(const char* e) {
+#if (HAL_USE_SERIAL == TRUE)
   printf("Length Error :%s\n", e);
+#else
+  static_cast<void>(e);
+#endif
 }
 }
 
@@ -45,6 +53,8 @@ void operator delete[](void* ptr, size_t size) {
 
 // void __cxa_pure_virtual(void) {};
 
+#if (HAL_USE_SERIAL == TRUE)
+
 namespace std {
 int printf(const char* format, ...) {
   static BaseSequentialStream* chp =
@@ -66,3 +76,4 @@ int printf(const char* format, ...) {
   return size;
 }
 }  // namespace std
+#endif

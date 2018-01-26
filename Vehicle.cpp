@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 Formula Slug. All Rights Reserved.
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
 
 #include "Vehicle.h"
 

@@ -1,8 +1,8 @@
-// Copyright (c) 2016-2017 Formula Slug. All Rights Reserved.
-
-#include "thread.h"
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
 
 #include <utility>
+
+#include "thread.h"
 
 thread::thread(thread&& rhs) noexcept { *this = std::move(rhs); }
 

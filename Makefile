@@ -88,11 +88,13 @@ PROJECT = fs-1-primary
 # Imported source files and paths
 CHIBIOS = ChibiOS
 # Startup files.
-include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk # NOTE: Changed from startup_stm32f3xx.mk
+# NOTE: Changed from startup_stm32f3xx.mk
+include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk
 # HAL-OSAL files (optional).
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/hal/ports/STM32/STM32F4xx/platform.mk
-include $(CHIBIOS)/os/hal/boards/ST_STM32F4_DISCOVERY/board.mk # NOTE: Changed from /os/hal/boards/ST_NUCLEO32_F303K8/board.mk
+# NOTE: Changed from /os/hal/boards/ST_NUCLEO32_F303K8/board.mk
+include $(CHIBIOS)/os/hal/boards/ST_STM32F4_DISCOVERY/board.mk
 include $(CHIBIOS)/os/hal/osal/rt/osal.mk
 # RTOS files (optional).
 include $(CHIBIOS)/os/rt/rt.mk
@@ -101,7 +103,8 @@ include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
 
 # Define linker script file here
-LDSCRIPT= $(STARTUPLD)/STM32F407xG.ld # NOTE: Changed from STM32F303x8.ld
+# NOTE: Changed from STM32F303x8.ld
+LDSCRIPT= $(STARTUPLD)/STM32F407xG.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -222,7 +225,8 @@ include $(RULESPATH)/rules.mk
 
 .PHONY: upload
 upload: all
-	openocd -f board/st_nucleo_f3.cfg -c "program build/$(PROJECT).elf verify reset exit"
+	openocd -f board/stm32f4discovery.cfg -c "program build/$(PROJECT).elf verify reset exit"
+# NOTE ^ changed from openocd -f board/st_nucleo_f4.cfg -c "program build/$(PROJECT).elf verify reset exit"
 
 .PHONY: debug
 debug: all

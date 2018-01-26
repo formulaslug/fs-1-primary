@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2017 Formula Slug. All Rights Reserved.
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
 
 #pragma once
 

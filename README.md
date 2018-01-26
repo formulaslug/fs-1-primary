@@ -1,3 +1,5 @@
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
 # Primary Controls
 
 This repository contains the software for our primary controller of the Formula Slug 2017 racecar, FS-1.

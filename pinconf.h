@@ -1,3 +1,5 @@
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
 // Current chip
 #define STM32F4
 
