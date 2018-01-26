@@ -95,7 +95,7 @@ bool CanBus::send(uint64_t data) {
 }
 
 bool CanBus::send(const CANTxFrame& msg) {
-  if (canTransmit(&CAND1, CAN_ANY_MAILBOX, &msg, MS2ST(100)) == MSG_OK) {
+  if (canTransmit(&CAND1, CAN_ANY_MAILBOX, &msg, TIME_MS2I(100)) == MSG_OK) {
     palWriteLine(CAN_STATUS_LINE_LED, PAL_HIGH);
     return true;
   } else {

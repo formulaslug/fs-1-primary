@@ -211,7 +211,7 @@ void canRxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
   chEvtRegister(&CAND1.rxfull_event, &el, 0);
 
   while (true) {
-    if (chEvtWaitAnyTimeout(ALL_EVENTS, MS2ST(100)) == 0) {
+    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
       continue;
     }
     {
