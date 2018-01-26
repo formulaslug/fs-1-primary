@@ -225,7 +225,7 @@ include $(RULESPATH)/rules.mk
 
 .PHONY: upload
 upload: all
-	openocd -f board/stm32f4discovery.cfg -c "program build/$(PROJECT).elf verify reset exit"
+	openocd -s . -f stm32f4discovery_stlink21.cfg -c "program build/$(PROJECT).elf verify reset exit"
 # NOTE ^ changed from openocd -f board/st_nucleo_f4.cfg -c "program build/$(PROJECT).elf verify reset exit"
 
 .PHONY: debug
