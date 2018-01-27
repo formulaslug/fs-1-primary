@@ -71,6 +71,15 @@ int main() {
   // Start transmitter thread
   thread canTxThread(NORMALPRIO + 7, canTxThreadFunc, canBus, canBusMut);
 
+  // Indicate startup - blink then stay on
+  palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+  for (uint8_t i = 0; i < 2; i++) {
+    palWritePad(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_LOW);
+    chThdSleepMilliseconds(300);
+    palWritePad(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_HIGH);
+    chThdSleepMilliseconds(300);
+  }
+
   while (1) {
     {
       std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
