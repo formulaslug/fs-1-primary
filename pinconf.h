@@ -49,4 +49,20 @@
 
 #define BRAKE_LIGHT_PORT GPIOB
 #define BRAKE_LIGHT_PIN GPIOB_PIN1
+
+#define STARTUP_LED_PORT GPIOD
+#define STARTUP_LED_PIN GPIOD_LED4
+
+/*
+ * START CAN pins
+ * @note These are not implemented in codebase, just here for reference
+ */
+#define CAN1_TX_PORT GPIOD
+#define CAN1_TX_PIN GPIOD_PIN0
+
+#define CAN1_RX_PORT GPIOD
+#define CAN1_RX_PIN GPIOD_PIN1
+/*
+ * END CAN pins
+ */
 #endif
