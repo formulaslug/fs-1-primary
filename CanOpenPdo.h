@@ -8,17 +8,50 @@
 #include "hal.h"
 
 // COB-IDs: MAX LENGTH of 12 bits, only the LSB 12 should be used
+// IDs specified in format 0x<system-id><node-id><function-id>
+// NOTE: The constexprs below are now bit-shifted, there OR'd as-is so
+//       the values must be in the correct hex digit.
+// System IDs: 6 = FS System
+// Node IDs:
+//   1 = Primary Controller, (node 3)
+//   2 = Secondary Controller, (node 4) (NOTE: Unused...)
+//   3 = Cell Temp Monitor
+//     // Function IDs
+//     2 = ADC Chip 1 Reading
+//     3 = ADC Chip 2 Reading
+//     4 = ADC Chip 3 Reading
+//     5 = ADC Chip 4 Reading
+//     6 = Fault Statuses for Temp, BMS, and IMD
+// Universal Function IDs:
+//   1 = Heartbeat
+
+// System IDs
+constexpr uint32_t kSysIdMask = 0xf00;
+constexpr uint32_t kSysIdFs = 0x600;
+// Node IDs
+constexpr uint32_t kNodeIdMask = 0x0f0;
+constexpr uint32_t kNodeIdPrimary = 0x010;
+constexpr uint32_t kNodeIdSecondary = 0x020;
+constexpr uint32_t kNodeIdCellTemp = 0x030;
+// Function IDs
+constexpr uint32_t kFuncIdMask = 0x00f;
+constexpr uint32_t kFuncIdHeartbeat = 0x001;
+constexpr uint32_t kFuncIdCellTempAdc[4] = {0x002, 0x003, 0x004, 0x005};
+constexpr uint32_t kFuncIdFaultStatuses = 0x006;
+// Full COB-IDs
 constexpr uint32_t kCobIdTPDO5 = 0x241;  // including throttle voltage payload
-constexpr uint32_t kCobIdNode3Heartbeat = 0x003;
-constexpr uint32_t kCobIdNode4Heartbeat = 0x004;
-constexpr uint32_t kCobIdP2s = 0x013;
-constexpr uint32_t kCobIdS2p = 0x014;
+constexpr uint32_t kCobIdNode3Heartbeat = 0x611;
+constexpr uint32_t kCobIdNode4Heartbeat = 0x621;
+constexpr uint32_t kCobIdCellTempHeartbeat = 0x631;
+constexpr uint32_t kCobIdP2s = 0x613;
+constexpr uint32_t kCobIdS2p = 0x622;
 
 // Payload constants
 constexpr uint32_t kPayloadHeartbeat = 0x1;
 
 struct HeartbeatMessage : public CANTxFrame {
-  explicit HeartbeatMessage(uint32_t id);
+  // explicit HeartbeatMessage(uint32_t id);
+  HeartbeatMessage(uint16_t data);
 };
 
 struct ThrottleMessage : public CANTxFrame {
