@@ -7,10 +7,6 @@
 #include "CircularBuffer.h"
 #include "hal.h"
 
-// pin mappings
-// TODO: Change to constexpr after finding out the resolved type of "line"
-#define CAN_STATUS_LINE_LED LINE_LED3
-
 enum class CanBusBaudRate : uint8_t {
   k125k,  // 125 kHz
   k250k,  // 250 kHz

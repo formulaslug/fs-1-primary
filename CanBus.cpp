@@ -1,10 +1,11 @@
 // Copyright (c) 2018 Formula Slug. All Rights Reserved.
 
+#include "CanBus.h"
+#include "mcuconfFs.h"
+
 #include <cmath>
 #include <cstdio>
 #include <vector>
-
-#include "CanBus.h"
 
 /* baudrate = 36MHz / ((1 + BRP) * (3 + TS1 + TS2))
  * See STM32F103xx reference manual, 24.7.7 for info on CAN_BTR register.
@@ -27,22 +28,22 @@ constexpr CANConfig MakeConfig(CanBusBaudRate baud, bool loopback) {
 
   switch (baud) {
     case CanBusBaudRate::k125k:
-      btr |= CAN_BTR_BRP(239);
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_125k);
       break;
     case CanBusBaudRate::k250k:
-      btr |= CAN_BTR_BRP(11);
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_250k); // was 11
       break;
     case CanBusBaudRate::k500k:
-      btr |= CAN_BTR_BRP(5);
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_500k); // test hal says 6 (was 5)
       break;
     case CanBusBaudRate::k1M:
-      btr |= CAN_BTR_BRP(2);
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_1M);
       break;
     case CanBusBaudRate::k1M5:
-      btr |= CAN_BTR_BRP(1);
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_1M5);
       break;
     case CanBusBaudRate::k3M:
-      btr |= CAN_BTR_BRP(0);
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_3M);
       break;
   }
 
@@ -55,7 +56,13 @@ CanBus::CanBus(uint32_t id, CanBusBaudRate baud, bool loopback) {
   CANConfig config = MakeConfig(baud, loopback);
   canStart(&CAND1, &config);
 
-  palWriteLine(CAN_STATUS_LINE_LED, PAL_LOW);
+  // config the pins
+  palSetPadMode(GPIOD, 0, PAL_MODE_ALTERNATE(9));  // CAN RX
+  palSetPadMode(GPIOD, 1, PAL_MODE_ALTERNATE(9));  // CAN TX
+  palSetPadMode(CAN_STATUS_LED_PORT,
+      CAN_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+
+  palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
 }
 
 CanBus::~CanBus() { canStop(&CAND1); }
@@ -74,32 +81,45 @@ void CanBus::setFilters(std::initializer_list<uint32_t> filters) {
 
     filterArray.push_back(temp);
 
-    i++;
+    ++i;
   }
 
   // TODO: filters currently do nothing
   static_cast<void>(filterArray);
 }
 
+// NOTE: Unused - implemented for testing
 bool CanBus::send(uint64_t data) {
   static CANTxFrame msg;
 
-  msg.IDE = CAN_IDE_EXT;
+  msg.IDE = CAN_IDE_STD;
   msg.EID = m_id;
   msg.RTR = CAN_RTR_DATA;
   msg.DLC = 8;
-  msg.data32[0] = data & 0xFFFF;
-  msg.data32[1] = data >> 32;
+  msg.data32[0] = data >> 32;         // MS 32 bits
+  msg.data32[1] = data & 0xFFFFFFFF;  // LS 32 bits
 
   return send(msg);
 }
 
 bool CanBus::send(const CANTxFrame& msg) {
   if (canTransmit(&CAND1, CAN_ANY_MAILBOX, &msg, TIME_MS2I(100)) == MSG_OK) {
-    palWriteLine(CAN_STATUS_LINE_LED, PAL_HIGH);
+    // success
+    for (int i = 0; i < 1; ++i) {
+      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_HIGH);
+      chThdSleepMilliseconds(100);
+      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
+      chThdSleepMilliseconds(100);
+    }
     return true;
   } else {
-    palWriteLine(CAN_STATUS_LINE_LED, PAL_LOW);
+    // failure
+    for (int i = 0; i < 1; ++i) {
+      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_HIGH);
+      chThdSleepMilliseconds(100);
+      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
+      chThdSleepMilliseconds(100);
+    }
     return false;
   }
 }
