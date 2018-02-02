@@ -8,8 +8,11 @@
 #include "Vehicle.h"
 #include "ch.hpp"
 #include "hal.h"
-#include "pinconf.h"
-#include "thread.h"
+#include "mcuconfFs.h"
+
+// TODO: Fix this garbage
+#define CAN_BUS (*(CanBus*)((*(std::vector<void*>*)arg)[0]))
+#define CAN_BUS_MUT *(chibios_rt::Mutex*)((*(std::vector<void*>*)arg)[1])
 
 /**
  * If the range is ordered as (min, max), minimum input values map to 0.
@@ -23,10 +26,93 @@ double normalize(const std::array<double, 2> range, double input) {
   return (input - range[0]) / (range[1] - range[0]);
 }
 
-void heartbeatThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut);
-void inputProcThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut);
-void canRxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut);
-void canTxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut);
+/**
+ * @desc Performs period tasks every second
+ */
+static THD_WORKING_AREA(heartbeatThreadFuncWa, 128);
+static THD_FUNCTION(heartbeatThreadFunc, arg) {
+  chRegSetThreadName("NODE HEARTBEAT");
+
+  while (1) {
+    // enqueue heartbeat message to g_canTxQueue
+    // TODO: Remove need for node ID param to heartbeat obj (passed
+    //       during instantiation of CAN bus)
+    const HeartbeatMessage heartbeatMessage(0x1);
+    {
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      (CAN_BUS).queueTxMessage(heartbeatMessage);
+    }
+    // transmit node's (self) heartbeat every 1s
+    chThdSleepMilliseconds(1000);
+  }
+}
+
+// static THD_WORKING_AREA(inputProcThreadFuncWa, 128);
+// static THD_FUNCTION(inputProcThreadFunc, arg) {
+//   double leftThrottle = 0;
+//   double rightThrottle = 0;
+//   double throttle = 0;
+//   bool driveButton = false;
+//
+//   while (true) {
+//     // leftThrottle = normalize({500, 750}, analogRead(A0));
+//     // rightThrottle = normalize({550, 295}, analogRead(A3));
+//     throttle = (leftThrottle + rightThrottle) / 2;
+//     // driveButton = digitalReadFast(23);
+//
+//     // enqueue throttle voltage periodically as well
+//     const ThrottleMessage throttleMessage(65536 * throttle, driveButton);
+//     {
+//       std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+//       (CAN_BUS).queueTxMessage(throttleMessage);
+//     }
+//
+//     chThdSleepMilliseconds(100);
+//   }
+// }
+
+
+/*
+ * CAN TX thread
+ */
+static THD_WORKING_AREA(canTxThreadFuncWa, 128);
+static THD_FUNCTION(canTxThreadFunc, arg) {
+  chRegSetThreadName("CAN TX");
+
+  while (true) {
+    {
+      // Lock from simultaneous thread access
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      // Process all messages to transmit from the message transmission queue
+      (CAN_BUS).processTxMessages();
+    }
+    // throttle back thread runloop to prevent overconsumption of resources
+    chThdSleepMilliseconds(10);
+  }
+}
+
+/*
+ * CAN RX thread
+ */
+static THD_WORKING_AREA(canRxThreadFuncWa, 128);
+static THD_FUNCTION(canRxThreadFunc, arg) {
+  event_listener_t el;
+
+  chRegSetThreadName("CAN RX");
+  chEvtRegister(&CAND1.rxfull_event, &el, 0);
+
+  while (true) {
+    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
+      continue;
+    }
+    {
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      (CAN_BUS).processRxMessages();
+    }
+  }
+
+  chEvtUnregister(&CAND1.rxfull_event, &el);
+}
 
 int main() {
   /*
@@ -45,6 +131,21 @@ int main() {
   palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT);
   palSetPadMode(ARBITRARY_PORT_2, ARBITRARY_PIN_2, PAL_MODE_INPUT_PULLUP);
   palSetPadMode(ARBITRARY_PORT_3, ARBITRARY_PIN_3, PAL_MODE_INPUT_PULLUP);
+  // Fault indicator lights
+  palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // IMD
+  palSetPadMode(BMS_FAULT_INDICATOR_PORT, BMS_FAULT_INDICATOR_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // BMS
+  palSetPadMode(TEMP_FAULT_INDICATOR_PORT, TEMP_FAULT_INDICATOR_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // Temp
+
+  // Init LED fault states to LOW
+  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+      PAL_LOW);  // IMD
+  palWritePad(BMS_FAULT_INDICATOR_PORT, BMS_FAULT_INDICATOR_PIN,
+      PAL_LOW);  // BMS
+  palWritePad(TEMP_FAULT_INDICATOR_PORT, TEMP_FAULT_INDICATOR_PIN,
+      PAL_LOW);  // Temp
 
   // Turn off startup sound
   palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_MODE_OUTPUT_PUSHPULL);
@@ -57,19 +158,12 @@ int main() {
   Vehicle vehicle;
 
   // Activate CAN driver 1 (PA11 = CANRX, PA12 = CANTX)
-  CanBus canBus(0x680, CanBusBaudRate::k250k, true);
+  // CanBus canBus(0x680, CanBusBaudRate::k250k, true);
+  CanBus canBus(kNodeIdPrimary, CanBusBaudRate::k250k, false);
   chibios_rt::Mutex canBusMut;
 
-  thread heartbeatThread(NORMALPRIO + 3, heartbeatThreadFunc, canBus,
-                         canBusMut);
-
-  thread inputProcThread(NORMALPRIO, inputProcThreadFunc, canBus, canBusMut);
-
-  // Start receiver thread
-  thread canRxThread(NORMALPRIO + 7, canRxThreadFunc, canBus, canBusMut);
-
-  // Start transmitter thread
-  thread canTxThread(NORMALPRIO + 7, canTxThreadFunc, canBus, canBusMut);
+  // create void* compatible obj
+  std::vector<void*> args = {&canBus, &canBusMut};
 
   // Indicate startup - blink then stay on
   palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
@@ -80,14 +174,66 @@ int main() {
     chThdSleepMilliseconds(300);
   }
 
+  // start the CAN TX/RX threads
+  chThdCreateStatic(heartbeatThreadFuncWa, sizeof(heartbeatThreadFuncWa), NORMALPRIO,
+                    heartbeatThreadFunc, &args);
+  // chThdCreateStatic(inputProcThreadFuncWa, sizeof(inputProcThreadFuncWa), NORMALPRIO,
+  //                   inputProcThreadFunc, &args);
+  // start the CAN heartbeat thread
+  chThdCreateStatic(canRxThreadFuncWa, sizeof(canRxThreadFuncWa),
+                    NORMALPRIO, canRxThreadFunc, &args);
+  // Start SPI thread
+  chThdCreateStatic(canTxThreadFuncWa, sizeof(canTxThreadFuncWa), NORMALPRIO + 1,
+                    canTxThreadFunc, &args);
+
+  // TODO: Fault the system if it doesn't hear from the temp system
+  //       within 3 seconds of booting up
+  // TODO: Add fault states to vehicle obj
+  CANRxFrame msg;
+  uint8_t imdFaultPinState = PAL_LOW;
+  uint8_t bmsFaultPinState = PAL_LOW;
+  uint8_t tempFaultPinState = PAL_LOW;
+
   while (1) {
+    // pop new message
     {
       std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+      msg = canBus.dequeueRxMessage();
+    }
 
-      // print all transmitted messages
-      canBus.printTxAll();
-      // print all received messages
-      canBus.printRxAll();
+    // TODO: Switch the temp system over to standard length IDs
+    // switch on system transmitted form
+    switch (msg.EID & kSysIdMask) {
+      case kSysIdFs:
+        // switch on node transmitted from
+        switch (msg.EID & kNodeIdMask) {
+          case kNodeIdCellTemp:
+            // switch on function type
+            switch (msg.EID & kFuncIdMask) {
+              case kFuncIdFaultStatuses:
+                // unpack fault states
+                imdFaultPinState = (msg.data8[0] & 0x1) != 0 ? PAL_HIGH : PAL_LOW;
+                bmsFaultPinState = (msg.data8[0] & 0x2) != 0 ? PAL_HIGH : PAL_LOW;
+                tempFaultPinState = (msg.data8[0] & 0x4) != 0 ? PAL_HIGH : PAL_LOW;
+
+                // drive LEDs (did-faulted == PAL_HIGH == LED_ON)
+                palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+                    imdFaultPinState);
+                palWritePad(BMS_FAULT_INDICATOR_PORT, BMS_FAULT_INDICATOR_PIN,
+                    bmsFaultPinState);
+                palWritePad(TEMP_FAULT_INDICATOR_PORT, TEMP_FAULT_INDICATOR_PIN,
+                    tempFaultPinState);
+                break;
+              default:
+                break;
+            }
+            break;
+          default:
+            break;
+        }
+        break;
+      default:
+        break;
     }
 
 #if 0
@@ -169,78 +315,6 @@ int main() {
         break;
     }
 #endif
-
-    chThdSleepMilliseconds(50);
-  }
-}
-
-/**
- * @desc Performs period tasks every second
- */
-void heartbeatThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
-  while (1) {
-    // enqueue heartbeat message to g_canTxQueue
-    const HeartbeatMessage heartbeatMessage(kCobIdNode3Heartbeat);
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
-      canBus.queueTxMessage(heartbeatMessage);
-    }
-
-    chThdSleepMilliseconds(1000);
-  }
-}
-
-void inputProcThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
-  double leftThrottle = 0;
-  double rightThrottle = 0;
-  double throttle = 0;
-  bool driveButton = false;
-
-  while (1) {
-    // leftThrottle = normalize({500, 750}, analogRead(A0));
-    // rightThrottle = normalize({550, 295}, analogRead(A3));
-    throttle = (leftThrottle + rightThrottle) / 2;
-    // driveButton = digitalReadFast(23);
-
-    // enqueue throttle voltage periodically as well
-    const ThrottleMessage throttleMessage(65536 * throttle, driveButton);
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
-      canBus.queueTxMessage(throttleMessage);
-    }
-
-    chThdSleepMilliseconds(100);
-  }
-}
-
-void canRxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
-  event_listener_t el;
-
-  chRegSetThreadName("CAN RX");
-  chEvtRegister(&CAND1.rxfull_event, &el, 0);
-
-  while (true) {
-    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
-      continue;
-    }
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
-      canBus.processRxMessages();
-    }
-  }
-
-  chEvtUnregister(&CAND1.rxfull_event, &el);
-}
-
-void canTxThreadFunc(CanBus& canBus, chibios_rt::Mutex& canBusMut) {
-  chRegSetThreadName("CAN TX");
-
-  while (true) {
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
-      canBus.send(0x00FF00FF55AA55AA);
-      canBus.processTxMessages();
-    }
 
     chThdSleepMilliseconds(50);
   }
