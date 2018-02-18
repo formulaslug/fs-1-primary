@@ -57,8 +57,8 @@ CanBus::CanBus(uint32_t id, CanBusBaudRate baud, bool loopback) {
   canStart(&CAND1, &config);
 
   // config the pins
-  palSetPadMode(GPIOD, 0, PAL_MODE_ALTERNATE(9));  // CAN RX
-  palSetPadMode(GPIOD, 1, PAL_MODE_ALTERNATE(9));  // CAN TX
+  palSetPadMode(CAN1_RX_PORT, CAN1_RX_PIN, PAL_MODE_ALTERNATE(9));  // CAN RX
+  palSetPadMode(CAN1_TX_PORT, CAN1_TX_PIN, PAL_MODE_ALTERNATE(9));  // CAN TX
   palSetPadMode(CAN_STATUS_LED_PORT,
       CAN_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
 
@@ -115,10 +115,8 @@ bool CanBus::send(const CANTxFrame& msg) {
   } else {
     // failure
     for (int i = 0; i < 1; ++i) {
-      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_HIGH);
-      chThdSleepMilliseconds(100);
       palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
-      chThdSleepMilliseconds(100);
+      chThdSleepMilliseconds(500);
     }
     return false;
   }

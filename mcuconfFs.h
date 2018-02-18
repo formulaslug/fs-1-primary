@@ -94,13 +94,11 @@
 #define TEMP_FAULT_INDICATOR_PIN GPIOE_PIN14
 
 // START CAN pins
-// NOTE: That these are not implemented in codebase, just here for
-//       reference
 #define CAN1_TX_PORT GPIOD
-#define CAN1_TX_PIN GPIOD_PIN0
+#define CAN1_TX_PIN GPIOD_PIN1
 
 #define CAN1_RX_PORT GPIOD
-#define CAN1_RX_PIN GPIOD_PIN1
+#define CAN1_RX_PIN GPIOD_PIN0
 // END CAN pins
 #endif  /* STM32F3 */
 
