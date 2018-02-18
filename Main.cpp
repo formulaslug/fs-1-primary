@@ -47,6 +47,29 @@ static THD_FUNCTION(heartbeatThreadFunc, arg) {
   }
 }
 
+/**
+ * @desc Performs period tasks every second
+ */
+static THD_WORKING_AREA(throttleThreadFuncWa, 128);
+static THD_FUNCTION(throttleThreadFunc, arg) {
+  chRegSetThreadName("THROTTLE");
+
+  while (1) {
+    // enqueue heartbeat message to g_canTxQueue
+    // TODO: Remove need for node ID param to heartbeat obj (passed
+    //       during instantiation of CAN bus)
+    // ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch) {
+    const ThrottleMessage throttleMessage(1, true);
+    {
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      (CAN_BUS).queueTxMessage(throttleMessage);
+    }
+    // transmit node's (self) heartbeat every 1s
+    chThdSleepMilliseconds(200);
+  }
+}
+
+
 // static THD_WORKING_AREA(inputProcThreadFuncWa, 128);
 // static THD_FUNCTION(inputProcThreadFunc, arg) {
 //   double leftThrottle = 0;
@@ -185,6 +208,9 @@ int main() {
   // Start SPI thread
   chThdCreateStatic(canTxThreadFuncWa, sizeof(canTxThreadFuncWa), NORMALPRIO + 1,
                     canTxThreadFunc, &args);
+  // Start Throttle thread
+  chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
+                    throttleThreadFunc, &args);
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up

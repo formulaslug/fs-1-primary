@@ -39,7 +39,9 @@ constexpr uint32_t kFuncIdHeartbeat = 0x001;
 constexpr uint32_t kFuncIdCellTempAdc[4] = {0x002, 0x003, 0x004, 0x005};
 constexpr uint32_t kFuncIdFaultStatuses = 0x006;
 // Full COB-IDs
-constexpr uint32_t kCobIdTPDO5 = 0x241;  // including throttle voltage payload
+constexpr uint32_t kCobIdTPDO5 = 0x242;
+// constexpr uint32_t kCobIdTPDO5 = 0x241;  // including throttle voltage payload
+// constexpr uint32_t kCobIdTPDO5 = 0x80000000; // new COB-ID for testing
 constexpr uint32_t kCobIdNode3Heartbeat = 0x611;
 constexpr uint32_t kCobIdNode4Heartbeat = 0x621;
 constexpr uint32_t kCobIdCellTempHeartbeat = 0x631;
