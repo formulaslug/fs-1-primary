@@ -50,22 +50,30 @@ constexpr CANConfig MakeConfig(CanBusBaudRate baud, bool loopback) {
   return {CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP, btr};
 }
 
-CanBus::CanBus(uint32_t id, CanBusBaudRate baud, bool loopback) {
+CanBus::CanBus(uint32_t id, CANDriver *canp, CanBusBaudRate baud, bool loopback) {
   m_id = id;
+  m_canp = canp;
 
   CANConfig config = MakeConfig(baud, loopback);
-  canStart(&CAND1, &config);
+  canStart(m_canp, &config);
 
   // config the pins
-  palSetPadMode(CAN1_RX_PORT, CAN1_RX_PIN, PAL_MODE_ALTERNATE(9));  // CAN RX
-  palSetPadMode(CAN1_TX_PORT, CAN1_TX_PIN, PAL_MODE_ALTERNATE(9));  // CAN TX
-  palSetPadMode(CAN_STATUS_LED_PORT,
-      CAN_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
-
-  palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
+  if (canp == &CAND1) {
+    palSetPadMode(CAN1_RX_PORT, CAN1_RX_PIN, PAL_MODE_ALTERNATE(9));  // CAN RX
+    palSetPadMode(CAN1_TX_PORT, CAN1_TX_PIN, PAL_MODE_ALTERNATE(9));  // CAN TX
+    palSetPadMode(CAN1_STATUS_LED_PORT,
+        CAN1_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+    palWritePad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_LOW);
+  } else {
+    palSetPadMode(CAN2_RX_PORT, CAN2_RX_PIN, PAL_MODE_ALTERNATE(9));  // CAN RX
+    palSetPadMode(CAN2_TX_PORT, CAN2_TX_PIN, PAL_MODE_ALTERNATE(9));  // CAN TX
+    palSetPadMode(CAN2_STATUS_LED_PORT,
+        CAN2_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+    palWritePad(CAN2_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_LOW);
+  }
 }
 
-CanBus::~CanBus() { canStop(&CAND1); }
+CanBus::~CanBus() { canStop(m_canp); }
 
 void CanBus::setFilters(std::initializer_list<uint32_t> filters) {
   std::vector<CANFilter> filterArray;
@@ -102,28 +110,36 @@ bool CanBus::send(uint64_t data) {
   return send(msg);
 }
 
+/*
+ * @note A blinking LED for the CAN status LEDs indicates alterning
+ *       errors and successes, while a solid HIGH indicates continuous
+ *       success and a solid LOW indicates continuous failure.
+ */
 bool CanBus::send(const CANTxFrame& msg) {
-  if (canTransmit(&CAND1, CAN_ANY_MAILBOX, &msg, TIME_MS2I(100)) == MSG_OK) {
-    // success
-    for (int i = 0; i < 1; ++i) {
-      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_HIGH);
-      chThdSleepMilliseconds(100);
-      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
-      chThdSleepMilliseconds(100);
+  if (canTransmit(m_canp, CAN_ANY_MAILBOX, &msg, TIME_MS2I(100)) == MSG_OK) {
+    // success: HIGH LED
+    if (m_canp == &CAND1) {
+      palWritePad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_HIGH);
+    } else {
+      palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_HIGH);
     }
     return true;
   } else {
-    // failure
-    for (int i = 0; i < 1; ++i) {
-      palWritePad(CAN_STATUS_LED_PORT, CAN_STATUS_LED_PIN, PAL_LOW);
+    // error: LOW LED
+    if (m_canp == &CAND1) {
+      palWritePad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_LOW);
+      chThdSleepMilliseconds(500);
+    } else {
+      palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_LOW);
       chThdSleepMilliseconds(500);
     }
+    // failure
     return false;
   }
 }
 
 bool CanBus::recv(CANRxFrame& msg) {
-  return canReceive(&CAND1, CAN_ANY_MAILBOX, &msg, TIME_IMMEDIATE) == MSG_OK;
+  return canReceive(m_canp, CAN_ANY_MAILBOX, &msg, TIME_IMMEDIATE) == MSG_OK;
 }
 
 void CanBus::printTxMessage(const CANTxFrame& msg) const {

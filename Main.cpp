@@ -14,7 +14,7 @@
 #define CAN_BUS (*(CanBus*)((*(std::vector<void*>*)arg)[0]))
 #define CAN_BUS_MUT *(chibios_rt::Mutex*)((*(std::vector<void*>*)arg)[1])
 
-/**
+/*
  * If the range is ordered as (min, max), minimum input values map to 0.
  * If the range is ordered as (max, min), maximum input values map to 1.
  *
@@ -27,7 +27,28 @@ double normalize(const std::array<double, 2> range, double input) {
 }
 
 /**
- * @desc Performs period tasks every second
+ * @desc Performs period tasks every second for HV CAN bus
+ */
+static THD_WORKING_AREA(heartbeatHVThreadFuncWa, 128);
+static THD_FUNCTION(heartbeatHVThreadFunc, arg) {
+  chRegSetThreadName("NODE HEARTBEAT HV");
+
+  while (1) {
+    // enqueue heartbeat message to g_canTxQueue
+    // TODO: Remove need for node ID param to heartbeat obj (passed
+    //       during instantiation of CAN bus)
+    const HeartbeatMessage heartbeatMessage(0xfff);
+    {
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      (CAN_BUS).queueTxMessage(heartbeatMessage);
+    }
+    // transmit node's (self) heartbeat every 1s
+    chThdSleepMilliseconds(1000);
+  }
+}
+
+/**
+ * @desc Performs period tasks every second for LV CAN bus
  */
 static THD_WORKING_AREA(heartbeatThreadFuncWa, 128);
 static THD_FUNCTION(heartbeatThreadFunc, arg) {
@@ -46,6 +67,7 @@ static THD_FUNCTION(heartbeatThreadFunc, arg) {
     chThdSleepMilliseconds(1000);
   }
 }
+
 
 /**
  * @desc Performs period tasks every second
@@ -68,7 +90,6 @@ static THD_FUNCTION(throttleThreadFunc, arg) {
     chThdSleepMilliseconds(200);
   }
 }
-
 
 // static THD_WORKING_AREA(inputProcThreadFuncWa, 128);
 // static THD_FUNCTION(inputProcThreadFunc, arg) {
@@ -96,7 +117,7 @@ static THD_FUNCTION(throttleThreadFunc, arg) {
 
 
 /*
- * CAN TX thread
+ * CAN LV TX thread
  */
 static THD_WORKING_AREA(canTxThreadFuncWa, 128);
 static THD_FUNCTION(canTxThreadFunc, arg) {
@@ -115,7 +136,7 @@ static THD_FUNCTION(canTxThreadFunc, arg) {
 }
 
 /*
- * CAN RX thread
+ * CAN LV RX thread
  */
 static THD_WORKING_AREA(canRxThreadFuncWa, 128);
 static THD_FUNCTION(canRxThreadFunc, arg) {
@@ -136,6 +157,52 @@ static THD_FUNCTION(canRxThreadFunc, arg) {
 
   chEvtUnregister(&CAND1.rxfull_event, &el);
 }
+
+
+
+/*
+ * CAN HV TX thread
+ */
+static THD_WORKING_AREA(canTxHVThreadFuncWa, 128);
+static THD_FUNCTION(canTxHVThreadFunc, arg) {
+  chRegSetThreadName("CAN TX HV");
+
+  while (true) {
+    {
+      // Lock from simultaneous thread access
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      // Process all messages to transmit from the message transmission queue
+      (CAN_BUS).processTxMessages();
+    }
+    // throttle back thread runloop to prevent overconsumption of resources
+    chThdSleepMilliseconds(10);
+  }
+}
+
+/*
+ * CAN HV RX thread
+ */
+static THD_WORKING_AREA(canRxHVThreadFuncWa, 128);
+static THD_FUNCTION(canRxHVThreadFunc, arg) {
+  event_listener_t el;
+
+  chRegSetThreadName("CAN RX HV");
+  chEvtRegister(&CAND2.rxfull_event, &el, 0);
+
+  while (true) {
+    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
+      continue;
+    }
+    {
+      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
+      (CAN_BUS).processRxMessages();
+    }
+  }
+
+  chEvtUnregister(&CAND2.rxfull_event, &el);
+}
+
+
 
 int main() {
   /*
@@ -180,13 +247,15 @@ int main() {
 
   Vehicle vehicle;
 
-  // Activate CAN driver 1 (PA11 = CANRX, PA12 = CANTX)
-  // CanBus canBus(0x680, CanBusBaudRate::k250k, true);
-  CanBus canBus(kNodeIdPrimary, CanBusBaudRate::k250k, false);
+  CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k250k, false);
   chibios_rt::Mutex canBusMut;
+
+  CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k250k, false);
+  chibios_rt::Mutex canBusMutHV;
 
   // create void* compatible obj
   std::vector<void*> args = {&canBus, &canBusMut};
+  std::vector<void*> canArgsHV = {&canBusHV, &canBusMutHV};
 
   // Indicate startup - blink then stay on
   palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
@@ -196,21 +265,40 @@ int main() {
     palWritePad(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_HIGH);
     chThdSleepMilliseconds(300);
   }
+  // palSetPadMode(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+  // for (uint8_t i = 0; i < 2; i++) {
+  //   palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_LOW);
+  //   chThdSleepMilliseconds(300);
+  //   palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_HIGH);
+  //   chThdSleepMilliseconds(300);
+  //   palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_LOW);
+  // }
 
-  // start the CAN TX/RX threads
-  chThdCreateStatic(heartbeatThreadFuncWa, sizeof(heartbeatThreadFuncWa), NORMALPRIO,
-                    heartbeatThreadFunc, &args);
-  // chThdCreateStatic(inputProcThreadFuncWa, sizeof(inputProcThreadFuncWa), NORMALPRIO,
-  //                   inputProcThreadFunc, &args);
-  // start the CAN heartbeat thread
+  // CAN LV threads
   chThdCreateStatic(canRxThreadFuncWa, sizeof(canRxThreadFuncWa),
                     NORMALPRIO, canRxThreadFunc, &args);
-  // Start SPI thread
   chThdCreateStatic(canTxThreadFuncWa, sizeof(canTxThreadFuncWa), NORMALPRIO + 1,
                     canTxThreadFunc, &args);
-  // Start Throttle thread
+  chThdCreateStatic(heartbeatThreadFuncWa, sizeof(heartbeatThreadFuncWa), NORMALPRIO,
+                    heartbeatThreadFunc, &args);
+  // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
+  //                   throttleThreadFunc, &args);
+
+  // CAN HV threads
+  chThdCreateStatic(heartbeatHVThreadFuncWa, sizeof(heartbeatHVThreadFuncWa), NORMALPRIO,
+                    heartbeatHVThreadFunc, &canArgsHV);
+  chThdCreateStatic(canTxHVThreadFuncWa, sizeof(canTxHVThreadFuncWa), NORMALPRIO + 1,
+                    canTxHVThreadFunc, &canArgsHV);
+  chThdCreateStatic(canRxHVThreadFuncWa, sizeof(canRxHVThreadFuncWa),
+                    NORMALPRIO, canRxHVThreadFunc, &canArgsHV);
   chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
-                    throttleThreadFunc, &args);
+                    throttleThreadFunc, &canArgsHV);
+
+  // Old throttle (and other) thread
+  // chThdCreateStatic(inputProcThreadFuncWa, sizeof(inputProcThreadFuncWa), NORMALPRIO,
+  //                   inputProcThreadFunc, &args);
+
+  // Start Throttle thread
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
@@ -222,10 +310,12 @@ int main() {
 
   while (1) {
     // pop new message
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
-      msg = canBus.dequeueRxMessage();
-    }
+    // {
+    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
+    //   msg = canBus.dequeueRxMessage();
+    // }
+
+    // TODO: Put guard on not dequeueing a message at all
 
     // TODO: Switch the temp system over to standard length IDs
     // switch on system transmitted form
