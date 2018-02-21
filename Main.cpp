@@ -216,25 +216,27 @@ int main() {
   chSysInit();
 
   // Configure input pins
-  palSetPadMode(ARBITRARY_PORT_1, ARBITRARY_PIN_1, PAL_MODE_INPUT);
-  palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT);
-  palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT);
-  palSetPadMode(ARBITRARY_PORT_2, ARBITRARY_PIN_2, PAL_MODE_INPUT_PULLUP);
-  palSetPadMode(ARBITRARY_PORT_3, ARBITRARY_PIN_3, PAL_MODE_INPUT_PULLUP);
+  // palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT);
+  // palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT);
+  // palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT);
+  // palSetPadMode(NEUTRAL_BUTTON_PORT, NUETRAL_BUTTON_PIN, PAL_MODE_INPUT_PULLUP);
+  // palSetPadMode(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN, PAL_MODE_INPUT_PULLUP);
+  // palSetPadMode(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN, PAL_MODE_INPUT_PULLUP);
+  // palSetPadMode(BSPD_FAULT_PORT, BSPD_FAULT_PIN, PAL_MODE_INPUT_PULLUP);
   // Fault indicator lights
   palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // IMD
-  palSetPadMode(BMS_FAULT_INDICATOR_PORT, BMS_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // BMS
-  palSetPadMode(TEMP_FAULT_INDICATOR_PORT, TEMP_FAULT_INDICATOR_PIN,
+  palSetPadMode(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // AMS
+  palSetPadMode(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // Temp
 
   // Init LED fault states to LOW
   palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
       PAL_LOW);  // IMD
-  palWritePad(BMS_FAULT_INDICATOR_PORT, BMS_FAULT_INDICATOR_PIN,
-      PAL_LOW);  // BMS
-  palWritePad(TEMP_FAULT_INDICATOR_PORT, TEMP_FAULT_INDICATOR_PIN,
+  palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+      PAL_LOW);  // AMS
+  palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
       PAL_LOW);  // Temp
 
   // Turn off startup sound
@@ -258,21 +260,22 @@ int main() {
   std::vector<void*> canArgsHV = {&canBusHV, &canBusMutHV};
 
   // Indicate startup - blink then stay on
-  palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
   for (uint8_t i = 0; i < 2; i++) {
-    palWritePad(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_LOW);
-    chThdSleepMilliseconds(300);
-    palWritePad(STARTUP_LED_PORT, STARTUP_LED_PIN, PAL_HIGH);
-    chThdSleepMilliseconds(300);
+    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+        PAL_HIGH);  // IMD
+    palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+        PAL_HIGH);  // AMS
+    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+        PAL_HIGH);  // Temp
+    chThdSleepMilliseconds(200);
+    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+        PAL_LOW);  // IMD
+    palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+        PAL_LOW);  // AMS
+    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+        PAL_LOW);  // Temp
+    chThdSleepMilliseconds(200);
   }
-  // palSetPadMode(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
-  // for (uint8_t i = 0; i < 2; i++) {
-  //   palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_LOW);
-  //   chThdSleepMilliseconds(300);
-  //   palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_HIGH);
-  //   chThdSleepMilliseconds(300);
-  //   palWritePad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN, PAL_LOW);
-  // }
 
   // CAN LV threads
   chThdCreateStatic(canRxThreadFuncWa, sizeof(canRxThreadFuncWa),
@@ -309,47 +312,44 @@ int main() {
   uint8_t tempFaultPinState = PAL_LOW;
 
   while (1) {
-    // pop new message
-    // {
-    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMut);
-    //   msg = canBus.dequeueRxMessage();
-    // }
+    // handle new packet if available
+    if (canBusHV.rxQueueSize() > 0 ) {
+      msg = canBusHV.dequeueRxMessage();
 
-    // TODO: Put guard on not dequeueing a message at all
+      // TODO: Switch the temp system over to standard length IDs
+      // switch on system transmitted form
+      switch (msg.EID & kSysIdMask) {
+        case kSysIdFs:
+          // switch on node transmitted from
+          switch (msg.EID & kNodeIdMask) {
+            case kNodeIdCellTemp:
+              // switch on function type
+              switch (msg.EID & kFuncIdMask) {
+                case kFuncIdFaultStatuses:
+                  // unpack fault states
+                  imdFaultPinState = (msg.data8[0] & 0x1) != 0 ? PAL_HIGH : PAL_LOW;
+                  bmsFaultPinState = (msg.data8[0] & 0x2) != 0 ? PAL_HIGH : PAL_LOW;
+                  tempFaultPinState = (msg.data8[0] & 0x4) != 0 ? PAL_HIGH : PAL_LOW;
 
-    // TODO: Switch the temp system over to standard length IDs
-    // switch on system transmitted form
-    switch (msg.EID & kSysIdMask) {
-      case kSysIdFs:
-        // switch on node transmitted from
-        switch (msg.EID & kNodeIdMask) {
-          case kNodeIdCellTemp:
-            // switch on function type
-            switch (msg.EID & kFuncIdMask) {
-              case kFuncIdFaultStatuses:
-                // unpack fault states
-                imdFaultPinState = (msg.data8[0] & 0x1) != 0 ? PAL_HIGH : PAL_LOW;
-                bmsFaultPinState = (msg.data8[0] & 0x2) != 0 ? PAL_HIGH : PAL_LOW;
-                tempFaultPinState = (msg.data8[0] & 0x4) != 0 ? PAL_HIGH : PAL_LOW;
-
-                // drive LEDs (did-faulted == PAL_HIGH == LED_ON)
-                palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-                    imdFaultPinState);
-                palWritePad(BMS_FAULT_INDICATOR_PORT, BMS_FAULT_INDICATOR_PIN,
-                    bmsFaultPinState);
-                palWritePad(TEMP_FAULT_INDICATOR_PORT, TEMP_FAULT_INDICATOR_PIN,
-                    tempFaultPinState);
-                break;
-              default:
-                break;
-            }
-            break;
-          default:
-            break;
-        }
-        break;
-      default:
-        break;
+                  // drive LEDs (did-faulted == PAL_HIGH == LED_ON)
+                  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+                      imdFaultPinState);
+                  palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+                      bmsFaultPinState);
+                  palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+                      tempFaultPinState);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            default:
+              break;
+          }
+          break;
+        default:
+          break;
+      }
     }
 
 #if 0
