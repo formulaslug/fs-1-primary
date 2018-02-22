@@ -229,7 +229,11 @@ int main() {
   palSetPadMode(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // AMS
   palSetPadMode(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // Temp
+      PAL_MODE_OUTPUT_PUSHPULL);  // BSPD
+  palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // RTDS signal
+  palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
 
   // Init LED fault states to LOW
   palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
@@ -237,7 +241,11 @@ int main() {
   palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
       PAL_LOW);  // AMS
   palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-      PAL_LOW);  // Temp
+      PAL_LOW);  // BSPD
+  palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
+      PAL_LOW);  // RTDS signal
+  palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
+      PAL_LOW);  // Brake light signal
 
   // Turn off startup sound
   palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_MODE_OUTPUT_PUSHPULL);
@@ -258,6 +266,10 @@ int main() {
   // create void* compatible obj
   std::vector<void*> args = {&canBus, &canBusMut};
   std::vector<void*> canArgsHV = {&canBusHV, &canBusMutHV};
+
+  // init RTDS signal high
+  palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
+      PAL_HIGH);  // RTDS signal
 
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 2; i++) {
