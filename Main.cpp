@@ -14,6 +14,38 @@
 #define CAN_BUS (*(CanBus*)((*(std::vector<void*>*)arg)[0]))
 #define CAN_BUS_MUT *(chibios_rt::Mutex*)((*(std::vector<void*>*)arg)[1])
 
+constexpr uint32_t kMaxPot = 1023;
+constexpr uint32_t kPotTolerance = 10;
+
+#define ADC_GRP1_NUM_CHANNELS   1
+#define ADC_GRP1_BUF_DEPTH      1
+
+static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
+
+/*
+ * ADC streaming callback.
+ */
+size_t nx = 0, ny = 0;
+static void adcerrorcallback(ADCDriver *adcp, adcerror_t err) {
+
+  (void)adcp;
+  (void)err;
+}
+
+static const ADCConversionGroup adcgrpcfg1 = {
+  FALSE,
+  ADC_GRP1_NUM_CHANNELS,
+  NULL,
+  adcerrorcallback,
+  0,                        /* CR1 */
+  ADC_CR2_SWSTART,          /* CR2 */
+  ADC_SMPR1_SMP_AN11(ADC_SAMPLE_3),
+  0,                        /* SMPR2 */
+  0,                        /* SQR1 */
+  0,                        /* SQR2 */
+  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN3)
+};
+
 /*
  * If the range is ordered as (min, max), minimum input values map to 0.
  * If the range is ordered as (max, min), maximum input values map to 1.
@@ -37,7 +69,7 @@ static THD_FUNCTION(heartbeatHVThreadFunc, arg) {
     // enqueue heartbeat message to g_canTxQueue
     // TODO: Remove need for node ID param to heartbeat obj (passed
     //       during instantiation of CAN bus)
-    const HeartbeatMessage heartbeatMessage(0xfff);
+    const HeartbeatMessage heartbeatMessage(0x2);
     {
       std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
       (CAN_BUS).queueTxMessage(heartbeatMessage);
@@ -214,16 +246,25 @@ int main() {
    */
   halInit();
   chSysInit();
+  adcStart(&ADCD1, NULL);
+  adcStart(&ADCD2, NULL);
+  adcStart(&ADCD3, NULL);
 
-  // Configure input pins
-  // palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT);
-  // palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT);
-  // palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT);
-  // palSetPadMode(NEUTRAL_BUTTON_PORT, NUETRAL_BUTTON_PIN, PAL_MODE_INPUT_PULLUP);
-  // palSetPadMode(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN, PAL_MODE_INPUT_PULLUP);
-  // palSetPadMode(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN, PAL_MODE_INPUT_PULLUP);
-  // palSetPadMode(BSPD_FAULT_PORT, BSPD_FAULT_PIN, PAL_MODE_INPUT_PULLUP);
-  // Fault indicator lights
+  // Pin initialization
+  // Analog inputs
+  palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
+  palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
+  palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
+  // Digital inputs
+  palSetPadMode(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN,
+      PAL_MODE_INPUT_PULLUP);  // IMD
+  palSetPadMode(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN,
+      PAL_MODE_INPUT_PULLUP);  // AMS
+  palSetPadMode(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN,
+      PAL_MODE_INPUT_PULLUP);  // BSPD
+  palSetPadMode(BSPD_FAULT_PORT, BSPD_FAULT_PIN,
+      PAL_MODE_INPUT_PULLUP);  // RTDS signal
+  // Digital outputs
   palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // IMD
   palSetPadMode(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
@@ -235,24 +276,11 @@ int main() {
   palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
 
-  // Init LED fault states to LOW
-  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-      PAL_LOW);  // IMD
-  palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-      PAL_LOW);  // AMS
-  palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-      PAL_LOW);  // BSPD
-  palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-      PAL_LOW);  // RTDS signal
-  palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
-      PAL_LOW);  // Brake light signal
-
-  // Turn off startup sound
-  palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+  // Init LED states to LOW (including faults)
+  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN, PAL_LOW);
+  palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN, PAL_LOW);
+  palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN, PAL_LOW);
   palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_LOW);
-
-  // Turn off brake light
-  palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_MODE_OUTPUT_PUSHPULL);
   palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_LOW);
 
   Vehicle vehicle;
@@ -266,10 +294,6 @@ int main() {
   // create void* compatible obj
   std::vector<void*> args = {&canBus, &canBusMut};
   std::vector<void*> canArgsHV = {&canBusHV, &canBusMutHV};
-
-  // init RTDS signal high
-  palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-      PAL_HIGH);  // RTDS signal
 
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 2; i++) {
@@ -306,8 +330,8 @@ int main() {
                     canTxHVThreadFunc, &canArgsHV);
   chThdCreateStatic(canRxHVThreadFuncWa, sizeof(canRxHVThreadFuncWa),
                     NORMALPRIO, canRxHVThreadFunc, &canArgsHV);
-  chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
-                    throttleThreadFunc, &canArgsHV);
+  // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
+  //                   throttleThreadFunc, &canArgsHV);
 
   // Old throttle (and other) thread
   // chThdCreateStatic(inputProcThreadFuncWa, sizeof(inputProcThreadFuncWa), NORMALPRIO,
@@ -323,7 +347,74 @@ int main() {
   uint8_t bmsFaultPinState = PAL_LOW;
   uint8_t tempFaultPinState = PAL_LOW;
 
+  uint32_t prevBrakeValue = 0,
+           prevRightThrottleValue = 0, prevLeftThrottleValue = 0;
+
   while (1) {
+    // read all digital inputs
+    auto neutralButton = palReadPad(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN);
+    auto driveButton = palReadPad(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN);
+    auto driveModeButton = palReadPad(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN);
+    auto bspdFault = palReadPad(BSPD_FAULT_PORT, BSPD_FAULT_PIN);
+
+
+    adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
+
+
+    // // read all analog inputs
+    // uint32_t brakeValue = palReadPad(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN);
+    // uint32_t rightThrottleValue = palReadPad(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN);
+    // uint32_t leftThrottleValue = palReadPad(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN);
+
+    const HeartbeatMessage brakeMessage(static_cast<uint16_t>(0xf000 | samples1[0]));
+    {
+      std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+      canBusHV.queueTxMessage(brakeMessage);
+    }
+    // const HeartbeatMessage rightThrottleMessage(static_cast<uint16_t>(0xe000 | rightThrottleValue));
+    // {
+    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+    //   canBusHV.queueTxMessage(rightThrottleMessage);
+    // }
+    // const HeartbeatMessage leftThrottleMessage(static_cast<uint16_t>(0xd000 | leftThrottleValue));
+    // {
+    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+    //   canBusHV.queueTxMessage(leftThrottleMessage);
+    // }
+
+    chThdSleepMilliseconds(200);
+
+    // // determine which pot value to use
+    // uint32_t potValue = 0;
+    // if (brakeValue - prevBrakeValue > 5 || brakeValue - prevBrakeValue < -5) {
+    //   potValue = static_cast<uint32_t>(brakeValue);
+    // } else {
+    //   potValue = static_cast<uint32_t>(rightThrottleValue);
+    // }
+    //
+    // // light a subset of LEDs 1-4 depending on rotation of that pot
+    // bool led0 = (potValue >> 2) > (kMaxPot >> 2);            // > 1/4 max pot
+    // bool led1 = (potValue >> 2) > (kMaxPot >> 1);            // > 2/4 max pot
+    // bool led2 = (potValue >> 2) > (kMaxPot >> 2) * 3;        // > 3/4 max pot
+    // bool led3 = (potValue >> 2) > (kMaxPot - kPotTolerance); // > 4/4 - 10 max pot
+    //
+    // // determine LED states
+    // auto ledState0 = neutralButton && led0 ? PAL_HIGH : PAL_LOW;
+    // auto ledState1 = driveButton && led1 ? PAL_HIGH : PAL_LOW;
+    // auto ledState2 = driveModeButton && led2 ? PAL_HIGH : PAL_LOW;
+    // auto ledState3 = bspdFault && led3 ? PAL_HIGH : PAL_LOW;
+    //
+    // // set LEDs (in-order) corresponding to each of the four digital inputs
+    // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+    //     ledState0);  // AMS
+    // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+    //     ledState1);  // IMD
+    // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+    //     ledState2);  // BSPD
+    // palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
+    //     ledState3);  // RTDS signal
+
+#if 0
     // handle new packet if available
     if (canBusHV.rxQueueSize() > 0 ) {
       msg = canBusHV.dequeueRxMessage();
@@ -363,6 +454,7 @@ int main() {
           break;
       }
     }
+#endif
 
 #if 0
     vehicle.dynamics.throttleVoltage =
