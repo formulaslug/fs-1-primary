@@ -46,6 +46,15 @@ static const ADCConversionGroup adcgrpcfg1 = {
   ADC_SQR3_SQ1_N(ADC_CHANNEL_IN3)
 };
 
+// STEERING_VALUE_PIN -> ADC123_IN10 (POT 1)
+//
+// BRAKE_VALUE_PIN -> ADC123_IN1 (POT 2)
+//
+// RIGHT_THROTTLE_PIN -> ADC123_IN2 (POT 1)
+//
+// LEFT_THROTTLE_PIN -> ADC123_IN3 (POT 1)
+
+
 /*
  * If the range is ordered as (min, max), minimum input values map to 0.
  * If the range is ordered as (max, min), maximum input values map to 1.
@@ -252,6 +261,7 @@ int main() {
 
   // Pin initialization
   // Analog inputs
+  palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
   palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
   palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
   palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
@@ -357,9 +367,7 @@ int main() {
     auto driveModeButton = palReadPad(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN);
     auto bspdFault = palReadPad(BSPD_FAULT_PORT, BSPD_FAULT_PIN);
 
-
     adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
-
 
     // // read all analog inputs
     // uint32_t brakeValue = palReadPad(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN);
@@ -371,18 +379,8 @@ int main() {
       std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
       canBusHV.queueTxMessage(brakeMessage);
     }
-    // const HeartbeatMessage rightThrottleMessage(static_cast<uint16_t>(0xe000 | rightThrottleValue));
-    // {
-    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-    //   canBusHV.queueTxMessage(rightThrottleMessage);
-    // }
-    // const HeartbeatMessage leftThrottleMessage(static_cast<uint16_t>(0xd000 | leftThrottleValue));
-    // {
-    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-    //   canBusHV.queueTxMessage(leftThrottleMessage);
-    // }
 
-    chThdSleepMilliseconds(200);
+    // chThdSleepMilliseconds(200);
 
     // // determine which pot value to use
     // uint32_t potValue = 0;
@@ -404,7 +402,7 @@ int main() {
     // auto ledState2 = driveModeButton && led2 ? PAL_HIGH : PAL_LOW;
     // auto ledState3 = bspdFault && led3 ? PAL_HIGH : PAL_LOW;
     //
-    // // set LEDs (in-order) corresponding to each of the four digital inputs
+    // set LEDs (in-order) corresponding to each of the four digital inputs
     // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
     //     ledState0);  // AMS
     // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
@@ -413,6 +411,16 @@ int main() {
     //     ledState2);  // BSPD
     // palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
     //     ledState3);  // RTDS signal
+
+
+    palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+        neutralButton ? PAL_HIGH : PAL_LOW);  // AMS
+    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+        driveButton ? PAL_HIGH : PAL_LOW);  // IMD
+    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+        driveModeButton ? PAL_HIGH : PAL_LOW);  // BSPD
+    palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
+        bspdFault ? PAL_HIGH : PAL_LOW);  // RTDS signal
 
 #if 0
     // handle new packet if available
