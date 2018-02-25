@@ -38,6 +38,9 @@ constexpr uint32_t kFuncIdMask = 0x00f;
 constexpr uint32_t kFuncIdHeartbeat = 0x001;
 constexpr uint32_t kFuncIdCellTempAdc[4] = {0x002, 0x003, 0x004, 0x005};
 constexpr uint32_t kFuncIdFaultStatuses = 0x006;
+constexpr uint32_t kFuncIdThrottleValue = 0x007;
+constexpr uint32_t kFuncIdBreakValue = 0x008;
+constexpr uint32_t kFuncIdSteeringValue = 0x009;
 // Full COB-IDs
 constexpr uint32_t kCobIdTPDO5 = 0x242;
 // constexpr uint32_t kCobIdTPDO5 = 0x241;  // including throttle voltage payload
@@ -62,7 +65,7 @@ struct ThrottleMessage : public CANTxFrame {
    *                        Master
    * @param forwardSwitch If true, enables forward drive
    */
-  ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch);
+  ThrottleMessage(uint16_t throttleVoltage);
 };
 
 /**

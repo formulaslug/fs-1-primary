@@ -32,14 +32,14 @@ HeartbeatMessage::HeartbeatMessage(uint16_t data) {
 //   std::memcpy(data8, &tpdo5, sizeof(TPDO5));
 // }
 
-ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch) {
+ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage) {
   IDE = CAN_IDE_EXT;
-  EID = kCobIdTPDO5;
+  EID = kSysIdFs | kNodeIdPrimary | kFuncIdThrottleValue; //kCobIdTPDO5;
   RTR = CAN_RTR_DATA;
   DLC = 2;
 
-  data8[0] = (throttleVoltage >> 8) & 0xFF; // MSB (32's 3rd byte)
-  data8[1] = throttleVoltage & 0xFF; // LSB (32's 4th byte)
+  data8[0] = throttleVoltage & 0xFF; // MSB (32's 3rd byte)
+  data8[1] = (throttleVoltage >> 8) & 0xFF; // LSB (32's 4th byte)
 
   // TPDO5 tpdo5;
   // tpdo5.throttleInputVoltage = throttleVoltage;

@@ -122,7 +122,7 @@ static THD_FUNCTION(throttleThreadFunc, arg) {
     // TODO: Remove need for node ID param to heartbeat obj (passed
     //       during instantiation of CAN bus)
     // ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch) {
-    const ThrottleMessage throttleMessage(1, true);
+    const ThrottleMessage throttleMessage(1);
     {
       std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
       (CAN_BUS).queueTxMessage(throttleMessage);
@@ -261,7 +261,7 @@ int main() {
 
   // Pin initialization
   // Analog inputs
-  palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
+  // palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
   palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
   palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
   palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
@@ -275,21 +275,21 @@ int main() {
   palSetPadMode(BSPD_FAULT_PORT, BSPD_FAULT_PIN,
       PAL_MODE_INPUT_PULLUP);  // RTDS signal
   // Digital outputs
-  palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // IMD
+  // palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+  //     PAL_MODE_OUTPUT_PUSHPULL);  // IMD
   palSetPadMode(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // AMS
-  palSetPadMode(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // BSPD
+  // palSetPadMode(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+  //     PAL_MODE_OUTPUT_PUSHPULL);  // BSPD
   palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // RTDS signal
   palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
 
   // Init LED states to LOW (including faults)
-  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN, PAL_LOW);
+  // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN, PAL_LOW);
   palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN, PAL_LOW);
-  palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN, PAL_LOW);
+  // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN, PAL_LOW);
   palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_LOW);
   palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_LOW);
 
@@ -307,19 +307,19 @@ int main() {
 
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 2; i++) {
-    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-        PAL_HIGH);  // IMD
+    // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+    //     PAL_HIGH);  // IMD
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
         PAL_HIGH);  // AMS
-    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        PAL_HIGH);  // Temp
+    // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+    //     PAL_HIGH);  // Temp
     chThdSleepMilliseconds(200);
-    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-        PAL_LOW);  // IMD
+    // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+    //     PAL_LOW);  // IMD
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
         PAL_LOW);  // AMS
-    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        PAL_LOW);  // Temp
+    // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+    //     PAL_LOW);  // Temp
     chThdSleepMilliseconds(200);
   }
 
@@ -374,11 +374,18 @@ int main() {
     // uint32_t rightThrottleValue = palReadPad(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN);
     // uint32_t leftThrottleValue = palReadPad(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN);
 
-    const HeartbeatMessage brakeMessage(static_cast<uint16_t>(0xf000 | samples1[0]));
+    // const HeartbeatMessage brakeMessage(static_cast<uint16_t>(0xf000 | samples1[0]));
+    // {
+    //   std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+    //   canBusHV.queueTxMessage(brakeMessage);
+    // }
+
+    const ThrottleMessage throttleMessage(static_cast<uint16_t>(0xfff & samples1[0]));
     {
       std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-      canBusHV.queueTxMessage(brakeMessage);
+      canBusHV.queueTxMessage(throttleMessage);
     }
+
 
     // chThdSleepMilliseconds(200);
 
@@ -415,10 +422,10 @@ int main() {
 
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
         neutralButton ? PAL_HIGH : PAL_LOW);  // AMS
-    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-        driveButton ? PAL_HIGH : PAL_LOW);  // IMD
-    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        driveModeButton ? PAL_HIGH : PAL_LOW);  // BSPD
+    // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+    //     driveButton ? PAL_HIGH : PAL_LOW);  // IMD
+    // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+    //     driveModeButton ? PAL_HIGH : PAL_LOW);  // BSPD
     palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
         bspdFault ? PAL_HIGH : PAL_LOW);  // RTDS signal
 
