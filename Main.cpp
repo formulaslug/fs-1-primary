@@ -43,7 +43,7 @@ static const ADCConversionGroup adcgrpcfg1 = {
   0,                        /* SMPR2 */
   0,                        /* SQR1 */
   0,                        /* SQR2 */
-  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN6)
+  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN2)
 };
 
 // STEERING_VALUE_PIN -> ADC12_IN6 (POT 1)
