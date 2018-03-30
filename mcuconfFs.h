@@ -59,7 +59,7 @@
 #ifdef STM32F4
 // Analog inputs
 #define STEERING_VALUE_PORT GPIOA
-#define STEERING_VALUE_PIN GPIOA_SDO // ADC12_IN6
+#define STEERING_VALUE_PIN GPIOA_SDO // ADC12_IN6 (pin A6)
 // TODO: ^ Change to GPIOA_PIN0 (discovery board has routed to button)
 
 #define BRAKE_VALUE_PORT GPIOA
