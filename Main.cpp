@@ -14,7 +14,7 @@
 #define CAN_BUS (*(CanBus*)((*(std::vector<void*>*)arg)[0]))
 #define CAN_BUS_MUT *(chibios_rt::Mutex*)((*(std::vector<void*>*)arg)[1])
 
-constexpr uint32_t kMaxPot = 1023;
+constexpr uint32_t kMaxPot = 512; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
 #define ADC_GRP1_NUM_CHANNELS   1
@@ -377,6 +377,10 @@ int main() {
 
     adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
 
+    // scaling to be from vref of 2.9V (as it appears Vdd is staying
+    // around on the discovery board when powered over USB)
+    uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
+
     // // read all analog inputs
     // uint32_t brakeValue = palReadPad(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN);
     // uint32_t rightThrottleValue = palReadPad(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN);
@@ -388,7 +392,11 @@ int main() {
     //   canBusHV.queueTxMessage(brakeMessage);
     // }
 
-    const ThrottleMessage throttleMessage(static_cast<uint16_t>(0xfff & samples1[0]));
+    if (throttleValue > kMaxPot) {
+      throttleValue = kMaxPot;
+    }
+
+    const ThrottleMessage throttleMessage(throttleValue);
     {
       std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
       canBusHV.queueTxMessage(throttleMessage);
@@ -429,11 +437,11 @@ int main() {
 
 
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-        neutralButton ? PAL_HIGH : PAL_LOW);  // AMS
-    // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-    //     driveButton ? PAL_HIGH : PAL_LOW);  // IMD
-    // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-    //     driveModeButton ? PAL_HIGH : PAL_LOW);  // BSPD
+        neutralButton ? PAL_LOW : PAL_HIGH);  // AMS
+    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+        driveButton ? PAL_LOW : PAL_HIGH);  // IMD
+    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+        driveModeButton ? PAL_LOW : PAL_HIGH);  // BSPD
     palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
         bspdFault ? PAL_HIGH : PAL_LOW);  // RTDS signal
 
@@ -559,6 +567,6 @@ int main() {
     }
 #endif
 
-    chThdSleepMilliseconds(50);
+    chThdSleepMilliseconds(100);
   }
 }

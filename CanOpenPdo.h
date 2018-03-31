@@ -25,6 +25,9 @@
 // Universal Function IDs:
 //   1 = Heartbeat
 
+// TODO: Reverse order of these (sys, node, func to func, node, sys) to
+//       use correct frame priority at physical layer
+
 // System IDs
 constexpr uint32_t kSysIdMask = 0xf00;
 constexpr uint32_t kSysIdFs = 0x600;
