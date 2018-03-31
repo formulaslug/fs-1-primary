@@ -295,10 +295,10 @@ int main() {
 
   Vehicle vehicle;
 
-  CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k250k, false);
+  CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k500k, false);
   chibios_rt::Mutex canBusMut;
 
-  CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k250k, false);
+  CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k500k, false);
   chibios_rt::Mutex canBusMutHV;
 
   // create void* compatible obj
@@ -365,8 +365,12 @@ int main() {
   uint8_t bmsFaultPinState = PAL_LOW;
   uint8_t tempFaultPinState = PAL_LOW;
 
-  uint32_t prevBrakeValue = 0,
-           prevRightThrottleValue = 0, prevLeftThrottleValue = 0;
+  // uint32_t prevBrakeValue = 0,
+  //          prevRightThrottleValue = 0, prevLeftThrottleValue = 0;
+
+  uint32_t throttleOutputs[2] = {};
+  uint32_t throttleInputs[11] = {};
+  uint8_t currentThrottleIndex = 0;
 
   while (1) {
     // read all digital inputs
@@ -379,7 +383,13 @@ int main() {
 
     // scaling to be from vref of 2.9V (as it appears Vdd is staying
     // around on the discovery board when powered over USB)
-    uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
+    // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
+
+    // fetch new input
+    throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & samples1[0]);
+
+    // shift outputs
+    throttleOutputs[0] = throttleOutputs[1];
 
     // // read all analog inputs
     // uint32_t brakeValue = palReadPad(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN);
@@ -392,16 +402,22 @@ int main() {
     //   canBusHV.queueTxMessage(brakeMessage);
     // }
 
-    if (throttleValue > kMaxPot) {
-      throttleValue = kMaxPot;
+    // y(n) = y(n-1) + x(n)/N - x(n-N)/N
+    uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
+    throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
+
+    if (throttleOutputs[1] > kMaxPot) {
+      throttleOutputs[1] = kMaxPot;
     }
 
-    const ThrottleMessage throttleMessage(throttleValue);
+    const ThrottleMessage throttleMessage(throttleOutputs[1]);
     {
       std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
       canBusHV.queueTxMessage(throttleMessage);
     }
 
+    // increment current index in circular buffer
+    currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
 
     // chThdSleepMilliseconds(200);
 
@@ -567,6 +583,6 @@ int main() {
     }
 #endif
 
-    chThdSleepMilliseconds(100);
+    chThdSleepMilliseconds(10);
   }
 }
