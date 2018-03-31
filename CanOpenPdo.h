@@ -28,20 +28,28 @@
 // TODO: Reverse order of these (sys, node, func to func, node, sys) to
 //       use correct frame priority at physical layer
 
+// COB-ID:
+// Function Code |      Node ID      | RTR
+//    X X X X        X X X X X X X      X
+// Ex/ ECU Heartbeat Packet
+//    0 0 0 1        0 0 0 0 0 1 0      0
+// Ex/ ECU Throttle Packet
+//    0 0 1 0        0 0 0 0 0 1 0      0
+
 // System IDs
-constexpr uint32_t kSysIdMask = 0xf00;
-constexpr uint32_t kSysIdFs = 0x600;
+constexpr uint32_t kSysIdMask = 0x00f;
+constexpr uint32_t kSysIdFs = 0x004; // 0b1000
 // Node IDs
 constexpr uint32_t kNodeIdMask = 0x0f0;
-constexpr uint32_t kNodeIdPrimary = 0x010;
+constexpr uint32_t kNodeIdPrimary = 0x000;
 constexpr uint32_t kNodeIdSecondary = 0x020;
 constexpr uint32_t kNodeIdCellTemp = 0x030;
 // Function IDs
 constexpr uint32_t kFuncIdMask = 0x00f;
-constexpr uint32_t kFuncIdHeartbeat = 0x001;
+constexpr uint32_t kFuncIdHeartbeat = 0x100;
 constexpr uint32_t kFuncIdCellTempAdc[4] = {0x002, 0x003, 0x004, 0x005};
 constexpr uint32_t kFuncIdFaultStatuses = 0x006;
-constexpr uint32_t kFuncIdThrottleValue = 0x007;
+constexpr uint32_t kFuncIdThrottleValue = 0x200;
 constexpr uint32_t kFuncIdBreakValue = 0x008;
 constexpr uint32_t kFuncIdSteeringValue = 0x009;
 // Full COB-IDs

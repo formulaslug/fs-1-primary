@@ -4,6 +4,8 @@
 
 #include <cstring>
 
+// TODO: Make COB-ID naming match CANOpen convention
+
 HeartbeatMessage::HeartbeatMessage(uint16_t data) {
   IDE = CAN_IDE_EXT;
   EID = kSysIdFs | kNodeIdPrimary | kFuncIdHeartbeat;
@@ -38,8 +40,8 @@ ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage) {
   RTR = CAN_RTR_DATA;
   DLC = 2;
 
-  data8[0] = throttleVoltage & 0xFF; // MSB (32's 3rd byte)
-  data8[1] = (throttleVoltage >> 8) & 0xFF; // LSB (32's 4th byte)
+  data8[0] = throttleVoltage & 0xFF; // MSB (32's 3rd byte) (left most byte in DVT)
+  data8[1] = (throttleVoltage >> 8) & 0xFF; // LSB (32's 4th byte) (right most byte in DVT)
 
   // TPDO5 tpdo5;
   // tpdo5.throttleInputVoltage = throttleVoltage;

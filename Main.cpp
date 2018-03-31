@@ -14,7 +14,7 @@
 #define CAN_BUS (*(CanBus*)((*(std::vector<void*>*)arg)[0]))
 #define CAN_BUS_MUT *(chibios_rt::Mutex*)((*(std::vector<void*>*)arg)[1])
 
-constexpr uint32_t kMaxPot = 512; // out of 4096 -- 512 is 1/8 max throttle value
+constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
 #define ADC_GRP1_NUM_CHANNELS   1
