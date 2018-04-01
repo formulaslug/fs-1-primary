@@ -406,15 +406,24 @@ int main() {
     uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
     throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
 
-    if (throttleOutputs[1] > kMaxPot) {
-      throttleOutputs[1] = kMaxPot;
+    // if (throttleOutputs[1] > kMaxPot) {
+    //   throttleOutputs[1] = kMaxPot;
+    // }
+
+    if (throttleOutputs[1] < 130) {
+      const ThrottleMessage throttleMessage(0);
+      {
+        std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+        canBusHV.queueTxMessage(throttleMessage);
+      }
+    } else {
+      const ThrottleMessage throttleMessage(throttleOutputs[1]);
+      {
+        std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+        canBusHV.queueTxMessage(throttleMessage);
+      }
     }
 
-    const ThrottleMessage throttleMessage(throttleOutputs[1]);
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-      canBusHV.queueTxMessage(throttleMessage);
-    }
 
     // increment current index in circular buffer
     currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
