@@ -372,10 +372,10 @@ int main() {
 
   uint32_t throttleOutputs[2] = {};
   // uint32_t throttleInputs[11] = {};
-  uint32_t throttleInputs[6] = {};
+  uint32_t throttleInputs[11] = {};
   uint8_t currentThrottleIndex = 0;
   int32_t prevThrottle = 0; // save for nonlinear threshold to update dash
-  const uint8_t requiredDelta = 8;
+  const uint8_t requiredDelta = 20;
 
   while (1) {
     // read all digital inputs
@@ -402,8 +402,8 @@ int main() {
     // uint32_t leftThrottleValue = palReadPad(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN);
 
     // y(n) = y(n-1) + x(n)/N - x(n-N)/N
-    uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 6;
-    throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/5 - throttleInputs[nextThrottleIndex]/5;
+    uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
+    throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
 
     if (throttleOutputs[1] < 130) {
       const ThrottleMessage throttleMessage(0);
@@ -421,12 +421,18 @@ int main() {
           canBusHV.queueTxMessage(throttleMessage);
         }
         prevThrottle = (int32_t)throttleOutputs[1];
+      } else {
+        const ThrottleMessage throttleMessage(prevThrottle);
+        {
+          std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
+          canBusHV.queueTxMessage(throttleMessage);
+        }
       }
     }
 
 
     // increment current index in circular buffer
-    currentThrottleIndex  = (currentThrottleIndex + 1) % 6;
+    currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
 
     // chThdSleepMilliseconds(200);
 
@@ -592,6 +598,6 @@ int main() {
     }
 #endif
 
-    chThdSleepMilliseconds(15); // update dash at ~ 66Hz
+    chThdSleepMilliseconds(14); // update dash at ~ 66Hz
   }
 }
