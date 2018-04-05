@@ -295,10 +295,12 @@ int main() {
 
   Vehicle vehicle;
 
-  CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k500k, false);
+  // CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k500k, false);
+  CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k1M, false);
   chibios_rt::Mutex canBusMut;
 
-  CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k500k, false);
+  // CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k500k, false);
+  CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k1M, false);
   chibios_rt::Mutex canBusMutHV;
 
   // create void* compatible obj

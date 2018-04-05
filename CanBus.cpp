@@ -20,7 +20,8 @@
  *   0     3M
  */
 constexpr CANConfig MakeConfig(CanBusBaudRate baud, bool loopback) {
-  uint32_t btr = CAN_BTR_SJW(0) | CAN_BTR_TS2(5) | CAN_BTR_TS1(4);
+  // uint32_t btr = CAN_BTR_SJW(0) | CAN_BTR_TS2(5) | CAN_BTR_TS1(4);
+  uint32_t btr = CAN_BTR_SJW(1) | CAN_BTR_TS2(1) | CAN_BTR_TS1(10);
 
   if (loopback) {
     btr |= CAN_BTR_LBKM;
