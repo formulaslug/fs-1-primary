@@ -414,7 +414,7 @@ int main() {
     } else {
       // const ThrottleMessage throttleMessage(throttleInputs[currentThrottleIndex]);
       int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
-      if (delta > requiredDelta || delta < -1*requiredDelta) {
+      if (delta >= requiredDelta || delta <= -1*requiredDelta) {
         const ThrottleMessage throttleMessage(throttleOutputs[1]);
         {
           std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
