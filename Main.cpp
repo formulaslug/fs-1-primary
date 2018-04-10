@@ -598,6 +598,6 @@ int main() {
     }
 #endif
 
-    chThdSleepMilliseconds(14); // update dash at ~ 66Hz
+    chThdSleepMilliseconds(10); // update dash at ~ 66Hz
   }
 }
