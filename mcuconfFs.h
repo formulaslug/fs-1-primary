@@ -20,7 +20,17 @@
 #define CAN_BTR_BRP_3M 0
 #endif  /* STM32F3 */
 
-#ifdef STM32F4
+#ifdef STM32F4_DISCOVERY
+#error "WHATS HAPPENING"
+#define CAN_BTR_BRP_125k 239
+#define CAN_BTR_BRP_250k 13
+#define CAN_BTR_BRP_500k 6
+#define CAN_BTR_BRP_1M 2
+#define CAN_BTR_BRP_1M5 1
+#define CAN_BTR_BRP_3M 0
+#endif  /* STM32F4 */
+
+#ifdef STM32F405
 #define CAN_BTR_BRP_125k 239
 #define CAN_BTR_BRP_250k 13
 #define CAN_BTR_BRP_500k 6
@@ -56,7 +66,8 @@
 #define BRAKE_LIGHT_PIN GPIOB_ARD_D5
 #endif  /* STM32F3 */
 
-#ifdef STM32F4
+#ifdef STM32F4_DISCOVERY
+#error "*************WHATS HAPPENING"
 // Analog inputs
 #define STEERING_VALUE_PORT GPIOA
 #define STEERING_VALUE_PIN GPIOA_SDO // ADC12_IN6 (pin A6)
@@ -222,7 +233,7 @@
 #define DRIVE_BUTTON_PORT TRI_STATE_SWITCH_DOWN_PORT
 #define DRIVE_BUTTON_PIN TRI_STATE_SWITCH_DOWN_PIN
 
-#endif  /* STM32F4 */
+#endif  /* STM32F405 */
 
 
 #endif  /* MCUCONF_FS_H */
