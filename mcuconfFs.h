@@ -32,7 +32,7 @@
 
 #ifdef STM32F405
 #define CAN_BTR_BRP_125k 239
-#define CAN_BTR_BRP_250k 13
+#define CAN_BTR_BRP_250k 11 // was 13
 #define CAN_BTR_BRP_500k 6
 #define CAN_BTR_BRP_1M 2
 #define CAN_BTR_BRP_1M5 1
