@@ -9,10 +9,9 @@
 #include "ch.hpp"
 #include "hal.h"
 #include "mcuconfFs.h"
-
-// TODO: Fix this garbage
-#define CAN_BUS (*(CanBus*)((*(std::vector<void*>*)arg)[0]))
-#define CAN_BUS_MUT *(chibios_rt::Mutex*)((*(std::vector<void*>*)arg)[1])
+#include "Event.h"
+#include "EventQueue.h"
+#include "CanChSubsys.h"
 
 constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
@@ -70,20 +69,13 @@ double normalize(const std::array<double, 2> range, double input) {
 /**
  * @desc Performs period tasks every second for HV CAN bus
  */
-static THD_WORKING_AREA(heartbeatHVThreadFuncWa, 128);
-static THD_FUNCTION(heartbeatHVThreadFunc, arg) {
+static THD_WORKING_AREA(heartbeatHvThreadFuncWa, 128);
+static THD_FUNCTION(heartbeatHvThreadFunc, canChSubsys) {
   chRegSetThreadName("NODE HEARTBEAT HV");
 
   while (1) {
-    // enqueue heartbeat message to g_canTxQueue
-    // TODO: Remove need for node ID param to heartbeat obj (passed
-    //       during instantiation of CAN bus)
-    const HeartbeatMessage heartbeatMessage(0x2);
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      (CAN_BUS).queueTxMessage(heartbeatMessage);
-    }
-    // transmit node's (self) heartbeat every 1s
+    HeartbeatMessage heartbeatMessage(0x1);
+    static_cast<CanChSubsys*>(canChSubsys)->startSend(heartbeatMessage);
     chThdSleepMilliseconds(1000);
   }
 }
@@ -91,159 +83,57 @@ static THD_FUNCTION(heartbeatHVThreadFunc, arg) {
 /**
  * @desc Performs period tasks every second for LV CAN bus
  */
-static THD_WORKING_AREA(heartbeatThreadFuncWa, 128);
-static THD_FUNCTION(heartbeatThreadFunc, arg) {
-  chRegSetThreadName("NODE HEARTBEAT");
+static THD_WORKING_AREA(heartbeatLvThreadFuncWa, 128);
+static THD_FUNCTION(heartbeatLvThreadFunc, canChSubsys) {
+  chRegSetThreadName("NODE HEARTBEAT LV");
 
   while (1) {
-    // enqueue heartbeat message to g_canTxQueue
-    // TODO: Remove need for node ID param to heartbeat obj (passed
-    //       during instantiation of CAN bus)
-    const HeartbeatMessage heartbeatMessage(0x1);
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      (CAN_BUS).queueTxMessage(heartbeatMessage);
-    }
-    // transmit node's (self) heartbeat every 1s
+    HeartbeatMessage heartbeatMessage(0x1);
+    static_cast<CanChSubsys*>(canChSubsys)->startSend(heartbeatMessage);
     chThdSleepMilliseconds(1000);
   }
 }
 
-
 /**
  * @desc Performs period tasks every second
  */
-static THD_WORKING_AREA(throttleThreadFuncWa, 128);
-static THD_FUNCTION(throttleThreadFunc, arg) {
-  chRegSetThreadName("THROTTLE");
-
-  while (1) {
-    // enqueue heartbeat message to g_canTxQueue
-    // TODO: Remove need for node ID param to heartbeat obj (passed
-    //       during instantiation of CAN bus)
-    // ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch) {
-    const ThrottleMessage throttleMessage(1);
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      (CAN_BUS).queueTxMessage(throttleMessage);
-    }
-    // transmit node's (self) heartbeat every 1s
-    chThdSleepMilliseconds(200);
-  }
-}
-
-// static THD_WORKING_AREA(inputProcThreadFuncWa, 128);
-// static THD_FUNCTION(inputProcThreadFunc, arg) {
-//   double leftThrottle = 0;
-//   double rightThrottle = 0;
-//   double throttle = 0;
-//   bool driveButton = false;
+// static THD_WORKING_AREA(throttleThreadFuncWa, 128);
+// static THD_FUNCTION(throttleThreadFunc, canChSubsys) {
+//   chRegSetThreadName("THROTTLE");
 //
-//   while (true) {
-//     // leftThrottle = normalize({500, 750}, analogRead(A0));
-//     // rightThrottle = normalize({550, 295}, analogRead(A3));
-//     throttle = (leftThrottle + rightThrottle) / 2;
-//     // driveButton = digitalReadFast(23);
-//
-//     // enqueue throttle voltage periodically as well
-//     const ThrottleMessage throttleMessage(65536 * throttle, driveButton);
-//     {
-//       std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-//       (CAN_BUS).queueTxMessage(throttleMessage);
-//     }
-//
-//     chThdSleepMilliseconds(100);
+//   while (1) {
+//     ThrottleMessage throttleMessage(1);
+//     static_cast<CanChSubsys*>(canChSubsys)->startSend(throttleMessage);
+//     chThdSleepMilliseconds(200);
 //   }
 // }
 
-
 /*
- * CAN LV TX thread
+ * CAN TX/RX threads for subsystem
  */
-static THD_WORKING_AREA(canTxThreadFuncWa, 128);
-static THD_FUNCTION(canTxThreadFunc, arg) {
-  chRegSetThreadName("CAN TX");
-
-  while (true) {
-    {
-      // Lock from simultaneous thread access
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      // Process all messages to transmit from the message transmission queue
-      (CAN_BUS).processTxMessages();
-    }
-    // throttle back thread runloop to prevent overconsumption of resources
-    chThdSleepMilliseconds(10);
-  }
+static THD_WORKING_AREA(canTxLvThreadFuncWa, 128);
+static THD_FUNCTION(canTxLvThreadFunc, canChSubsys) {
+  chRegSetThreadName("CAN TX LV");
+  static_cast<CanChSubsys*>(canChSubsys)->runTxThread();
 }
 
-/*
- * CAN LV RX thread
- */
-static THD_WORKING_AREA(canRxThreadFuncWa, 128);
-static THD_FUNCTION(canRxThreadFunc, arg) {
-  event_listener_t el;
-
-  chRegSetThreadName("CAN RX");
-  chEvtRegister(&CAND1.rxfull_event, &el, 0);
-
-  while (true) {
-    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
-      continue;
-    }
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      (CAN_BUS).processRxMessages();
-    }
-  }
-
-  chEvtUnregister(&CAND1.rxfull_event, &el);
+static THD_WORKING_AREA(canRxLvThreadFuncWa, 128);
+static THD_FUNCTION(canRxLvThreadFunc, canChSubsys) {
+  chRegSetThreadName("CAN RX LV");
+  static_cast<CanChSubsys*>(canChSubsys)->runRxThread();
 }
 
-
-
-/*
- * CAN HV TX thread
- */
-static THD_WORKING_AREA(canTxHVThreadFuncWa, 128);
-static THD_FUNCTION(canTxHVThreadFunc, arg) {
+static THD_WORKING_AREA(canTxHvThreadFuncWa, 128);
+static THD_FUNCTION(canTxHvThreadFunc, canChSubsys) {
   chRegSetThreadName("CAN TX HV");
-
-  while (true) {
-    {
-      // Lock from simultaneous thread access
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      // Process all messages to transmit from the message transmission queue
-      (CAN_BUS).processTxMessages();
-    }
-    // throttle back thread runloop to prevent overconsumption of resources
-    chThdSleepMilliseconds(10);
-  }
+  static_cast<CanChSubsys*>(canChSubsys)->runTxThread();
 }
 
-/*
- * CAN HV RX thread
- */
-static THD_WORKING_AREA(canRxHVThreadFuncWa, 128);
-static THD_FUNCTION(canRxHVThreadFunc, arg) {
-  event_listener_t el;
-
+static THD_WORKING_AREA(canRxHvThreadFuncWa, 128);
+static THD_FUNCTION(canRxHvThreadFunc, canChSubsys) {
   chRegSetThreadName("CAN RX HV");
-  chEvtRegister(&CAND2.rxfull_event, &el, 0);
-
-  while (true) {
-    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
-      continue;
-    }
-    {
-      std::lock_guard<chibios_rt::Mutex> lock(CAN_BUS_MUT);
-      (CAN_BUS).processRxMessages();
-    }
-  }
-
-  chEvtUnregister(&CAND2.rxfull_event, &el);
+  static_cast<CanChSubsys*>(canChSubsys)->runRxThread();
 }
-
-
 
 int main() {
   /*
@@ -255,6 +145,7 @@ int main() {
    */
   halInit();
   chSysInit();
+  // TODO: remember these are commented out
   adcStart(&ADCD1, NULL);
   adcStart(&ADCD2, NULL);
   adcStart(&ADCD3, NULL);
@@ -293,19 +184,16 @@ int main() {
   palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_LOW);
   palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_LOW);
 
+  // TODO: implement vehicle singleton
   Vehicle vehicle;
 
   // CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k500k, false);
-  CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k1M, false);
-  chibios_rt::Mutex canBusMut;
+  CanBus canBusLv(kNodeIdPrimary, &CAND1, CanBusBaudRate::k1M, false);
+  chibios_rt::Mutex canBusLvMut;
 
   // CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k500k, false);
-  CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k1M, false);
-  chibios_rt::Mutex canBusMutHV;
-
-  // create void* compatible obj
-  std::vector<void*> args = {&canBus, &canBusMut};
-  std::vector<void*> canArgsHV = {&canBusHV, &canBusMutHV};
+  CanBus canBusHv(kNodeIdPrimary, &CAND2, CanBusBaudRate::k1M, false);
+  chibios_rt::Mutex canBusHvMut;
 
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 2; i++) {
@@ -333,42 +221,42 @@ int main() {
     chThdSleepMilliseconds(200);
   }
 
-  // CAN LV threads
-  chThdCreateStatic(canRxThreadFuncWa, sizeof(canRxThreadFuncWa),
-                    NORMALPRIO, canRxThreadFunc, &args);
-  chThdCreateStatic(canTxThreadFuncWa, sizeof(canTxThreadFuncWa), NORMALPRIO + 1,
-                    canTxThreadFunc, &args);
-  chThdCreateStatic(heartbeatThreadFuncWa, sizeof(heartbeatThreadFuncWa), NORMALPRIO,
-                    heartbeatThreadFunc, &args);
+
+  /*
+   * Create subsystems
+   */
+  EventQueue fsmEventQueue = EventQueue();
+  CanChSubsys canLvChSubsys = CanChSubsys(canBusLv, canBusLvMut, fsmEventQueue);
+  CanChSubsys canHvChSubsys = CanChSubsys(canBusHv, canBusHvMut, fsmEventQueue);
+
+  /*
+   * Create threads (many of which are driving subsystems)
+   */
+  chThdCreateStatic(canRxLvThreadFuncWa, sizeof(canRxLvThreadFuncWa),
+                    NORMALPRIO, canRxLvThreadFunc, &canLvChSubsys);
+  chThdCreateStatic(canTxLvThreadFuncWa, sizeof(canTxLvThreadFuncWa), NORMALPRIO + 1,
+                    canTxLvThreadFunc, &canLvChSubsys);
+  chThdCreateStatic(heartbeatLvThreadFuncWa, sizeof(heartbeatLvThreadFuncWa), NORMALPRIO,
+                    heartbeatLvThreadFunc, &canLvChSubsys);
+  chThdCreateStatic(heartbeatHvThreadFuncWa, sizeof(heartbeatHvThreadFuncWa), NORMALPRIO,
+                    heartbeatHvThreadFunc, &canHvChSubsys);
+  chThdCreateStatic(canTxHvThreadFuncWa, sizeof(canTxHvThreadFuncWa), NORMALPRIO + 1,
+                    canTxHvThreadFunc, &canHvChSubsys);
+  chThdCreateStatic(canRxHvThreadFuncWa, sizeof(canRxHvThreadFuncWa),
+                    NORMALPRIO, canRxHvThreadFunc, &canHvChSubsys);
   // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
-  //                   throttleThreadFunc, &args);
+  //                   throttleThreadFunc, &canHvChSubsys);
 
-  // CAN HV threads
-  chThdCreateStatic(heartbeatHVThreadFuncWa, sizeof(heartbeatHVThreadFuncWa), NORMALPRIO,
-                    heartbeatHVThreadFunc, &canArgsHV);
-  chThdCreateStatic(canTxHVThreadFuncWa, sizeof(canTxHVThreadFuncWa), NORMALPRIO + 1,
-                    canTxHVThreadFunc, &canArgsHV);
-  chThdCreateStatic(canRxHVThreadFuncWa, sizeof(canRxHVThreadFuncWa),
-                    NORMALPRIO, canRxHVThreadFunc, &canArgsHV);
-  // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
-  //                   throttleThreadFunc, &canArgsHV);
 
-  // Old throttle (and other) thread
-  // chThdCreateStatic(inputProcThreadFuncWa, sizeof(inputProcThreadFuncWa), NORMALPRIO,
-  //                   inputProcThreadFunc, &args);
 
-  // Start Throttle thread
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
   // TODO: Add fault states to vehicle obj
-  CANRxFrame msg;
-  uint8_t imdFaultPinState = PAL_LOW;
-  uint8_t bmsFaultPinState = PAL_LOW;
-  uint8_t tempFaultPinState = PAL_LOW;
-
-  // uint32_t prevBrakeValue = 0,
-  //          prevRightThrottleValue = 0, prevLeftThrottleValue = 0;
+  // CANRxFrame msg;
+  // uint8_t imdFaultPinState = PAL_LOW;
+  // uint8_t bmsFaultPinState = PAL_LOW;
+  // uint8_t tempFaultPinState = PAL_LOW;
 
   uint32_t throttleOutputs[2] = {};
   // uint32_t throttleInputs[11] = {};
@@ -378,11 +266,22 @@ int main() {
   const uint8_t requiredDelta = 20;
 
   while (1) {
+
+    if (fsmEventQueue.size() > 0) {
+      // indicate received message
+      palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+          PAL_HIGH);  // IMD
+      palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+          PAL_HIGH);  // AMS
+      palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+          PAL_HIGH);  // BSPD
+    }
+
     // read all digital inputs
-    auto neutralButton = palReadPad(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN);
-    auto driveButton = palReadPad(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN);
-    auto driveModeButton = palReadPad(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN);
-    auto bspdFault = palReadPad(BSPD_FAULT_PORT, BSPD_FAULT_PIN);
+    // auto neutralButton = palReadPad(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN);
+    // auto driveButton = palReadPad(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN);
+    // auto driveModeButton = palReadPad(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN);
+    // auto bspdFault = palReadPad(BSPD_FAULT_PORT, BSPD_FAULT_PIN);
 
     adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
 
@@ -396,77 +295,30 @@ int main() {
     // shift outputs
     throttleOutputs[0] = throttleOutputs[1];
 
-    // // read all analog inputs
-    // uint32_t brakeValue = palReadPad(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN);
-    // uint32_t rightThrottleValue = palReadPad(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN);
-    // uint32_t leftThrottleValue = palReadPad(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN);
-
     // y(n) = y(n-1) + x(n)/N - x(n-N)/N
     uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
     throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
 
     if (throttleOutputs[1] < 130) {
-      const ThrottleMessage throttleMessage(0);
-      {
-        std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-        canBusHV.queueTxMessage(throttleMessage);
-      }
+      ThrottleMessage throttleMessage(0);
+      canHvChSubsys.startSend(throttleMessage);
     } else {
-      // const ThrottleMessage throttleMessage(throttleInputs[currentThrottleIndex]);
       int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
       if (delta >= requiredDelta || delta <= -1*requiredDelta) {
-        const ThrottleMessage throttleMessage(throttleOutputs[1]);
-        {
-          std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-          canBusHV.queueTxMessage(throttleMessage);
-        }
+        ThrottleMessage throttleMessage(throttleOutputs[1]);
+        canHvChSubsys.startSend(throttleMessage);
         prevThrottle = (int32_t)throttleOutputs[1];
       } else {
-        const ThrottleMessage throttleMessage(prevThrottle);
-        {
-          std::lock_guard<chibios_rt::Mutex> lock(canBusMutHV);
-          canBusHV.queueTxMessage(throttleMessage);
-        }
+        ThrottleMessage throttleMessage(prevThrottle);
+        canHvChSubsys.startSend(throttleMessage);
       }
     }
-
 
     // increment current index in circular buffer
     currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
 
-    // chThdSleepMilliseconds(200);
-
-    // // determine which pot value to use
-    // uint32_t potValue = 0;
-    // if (brakeValue - prevBrakeValue > 5 || brakeValue - prevBrakeValue < -5) {
-    //   potValue = static_cast<uint32_t>(brakeValue);
-    // } else {
-    //   potValue = static_cast<uint32_t>(rightThrottleValue);
-    // }
-    //
-    // // light a subset of LEDs 1-4 depending on rotation of that pot
-    // bool led0 = (potValue >> 2) > (kMaxPot >> 2);            // > 1/4 max pot
-    // bool led1 = (potValue >> 2) > (kMaxPot >> 1);            // > 2/4 max pot
-    // bool led2 = (potValue >> 2) > (kMaxPot >> 2) * 3;        // > 3/4 max pot
-    // bool led3 = (potValue >> 2) > (kMaxPot - kPotTolerance); // > 4/4 - 10 max pot
-    //
-    // // determine LED states
-    // auto ledState0 = neutralButton && led0 ? PAL_HIGH : PAL_LOW;
-    // auto ledState1 = driveButton && led1 ? PAL_HIGH : PAL_LOW;
-    // auto ledState2 = driveModeButton && led2 ? PAL_HIGH : PAL_LOW;
-    // auto ledState3 = bspdFault && led3 ? PAL_HIGH : PAL_LOW;
-    //
-    // set LEDs (in-order) corresponding to each of the four digital inputs
-    // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-    //     ledState0);  // AMS
-    // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-    //     ledState1);  // IMD
-    // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-    //     ledState2);  // BSPD
-    // palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-    //     ledState3);  // RTDS signal
-
-
+#if 0
+    // reflect button states on LEDs
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
         neutralButton ? PAL_LOW : PAL_HIGH);  // AMS
     palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
@@ -476,7 +328,6 @@ int main() {
     palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
         bspdFault ? PAL_HIGH : PAL_LOW);  // RTDS signal
 
-#if 0
     // handle new packet if available
     if (canBusHV.rxQueueSize() > 0 ) {
       msg = canBusHV.dequeueRxMessage();
@@ -515,86 +366,6 @@ int main() {
         default:
           break;
       }
-    }
-#endif
-
-#if 0
-    vehicle.dynamics.throttleVoltage =
-        analogRead(analogInputPins[kThrottleVoltage]);
-
-    // Vehicle's main state machine (FSM)
-    switch (vehicle.state) {
-      case kLVStartup:
-        // Perform kLVStartup functions HERE
-        vehicle.state = kLVActive;
-        break;
-      case kLVActive:
-        // Set LED feedback
-        vehicle.ledStates[kBlue] = kLEDOn;
-        vehicle.ledStates[kYellow] = kLEDOff;
-        vehicle.ledStates[kRed] = kLEDOff;
-
-        // Wait to move to kHVStartup
-        if (digitalReadFast(buttonPins[kHVToggle]) == LOW) {
-          vehicle.state = kHVStartup;
-        }
-        break;
-      case kHVShutdown:
-        // Perform kHVShutdown functions HERE
-
-        // Transition to kLVActive
-        vehicle.state = kLVActive;
-        break;
-      case kHVStartup:
-        // Perform kLVStartup functions HERE
-
-        vehicle.state = kHVActive;
-        break;
-      case kHVActive:
-        // Set LED feedback
-        vehicle.ledStates[kBlue] = kLEDOn;
-        vehicle.ledStates[kYellow] = kLEDOn;
-        vehicle.ledStates[kRed] = kLEDOff;
-
-        // Wait to move to kRTDStartup until user input
-        if (digitalReadFast(buttonPins[kRTDToggle]) == LOW) {
-          vehicle.state = kRTDStartup;
-        } else if (digitalReadFast(buttonPins[kHVToggle]) == LOW) {
-          // Or move back to LV active
-          vehicle.state = kHVShutdown;
-        }
-        break;
-      case kRTDShutdown:
-        // Perform kHVShutdown functions HERE
-
-        vehicle.state = kHVActive;
-        break;
-      case kRTDStartup:
-        // Perform kLVStartup functions HERE
-
-        // Show entire system is hot
-        vehicle.ledStates[kBlue] = kLEDOn;
-        vehicle.ledStates[kYellow] = kLEDOn;
-        vehicle.ledStates[kRed] = kLEDOn;
-
-        vehicle.state = kRTDActive;
-        break;
-      case kRTDActive:
-        // update current throttle voltage
-        vehicle.dynamics.throttleVoltage =
-            analogRead(analogInputPins[kThrottleVoltage]);
-
-        // Show speed
-        vehicle.ledStates[kSpeed] = ~vehicle.ledStates[kSpeed];
-
-        // Wait to transition back
-        if (digitalReadFast(buttonPins[kRTDToggle]) == LOW) {
-          // Start moving back to HV_ACTIVE
-          vehicle.ledStates[kSpeed] = kLEDOff;
-          vehicle.dynamics.throttleVoltage = 1;
-          vehicle.state = kRTDShutdown;
-        }
-        break;
     }
 #endif
 

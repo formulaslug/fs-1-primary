@@ -42,6 +42,10 @@ class CanBus {
   void printTxAll();
   void printRxAll();
 
+  // NOTE: Made this public, until this abstraction can be merged
+  //       with the CanChSubsys one
+  CANDriver *m_canp;
+
  private:
   // circular buffers to hold CanBus_message_t instances
   CircularBuffer<CANTxFrame> m_txQueue{10};
@@ -50,7 +54,6 @@ class CanBus {
   CircularBuffer<CANRxFrame> m_rxLogsQueue{10};
 
   uint32_t m_id = 0;
-  CANDriver *m_canp;
 
   // print CanBus message to serial console
   void printTxMessage(const CANTxFrame& msg) const;
