@@ -16,8 +16,8 @@
 constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-#define ADC_GRP1_NUM_CHANNELS   1
-#define ADC_GRP1_BUF_DEPTH      1
+#define ADC_GRP1_NUM_CHANNELS   2
+#define ADC_GRP1_BUF_DEPTH      8
 
 static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
 
@@ -31,19 +31,38 @@ static void adcerrorcallback(ADCDriver *adcp, adcerror_t err) {
   (void)err;
 }
 
+static void adcendcallback(ADCDriver *adcp, adcsample_t *buffer, size_t n) {
+  (void)adcp;
+  (void)buffer;
+  (void)n;
+  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+      PAL_HIGH);  // IMD
+}
+
 static const ADCConversionGroup adcgrpcfg1 = {
   FALSE,
   ADC_GRP1_NUM_CHANNELS,
-  NULL,
+  adcendcallback,
   adcerrorcallback,
   0,                        /* CR1 */
   ADC_CR2_SWSTART,          /* CR2 */
-  ADC_SMPR1_SMP_AN11(ADC_SAMPLE_3),
-  0,                        /* SMPR2 */
+  // SMPR1: Samples times for channels 10-17
+  0,
+  // SMPR2: Samples times for channels 0-9
+  // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+  // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+  ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
   0,                        /* SQR1 */
   0,                        /* SQR2 */
-  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN2)
+  // SQR1: Conversion group sequence 1-6
+  // @brief specify which channels, in which order, are sampled per
+  //        conversion sequence
+  // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+  //       ADC_CHANNEL_IN[Y]
+  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
 };
+
+// TODO: test brake and throttle together
 
 // STEERING_VALUE_PIN -> ADC12_IN6 (POT 1)
 //
@@ -290,7 +309,7 @@ int main() {
     // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
 
     // fetch new input
-    throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & samples1[0]);
+    throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & samples1[1]);
 
     // shift outputs
     throttleOutputs[0] = throttleOutputs[1];
@@ -301,16 +320,16 @@ int main() {
 
     if (throttleOutputs[1] < 130) {
       ThrottleMessage throttleMessage(0);
-      canHvChSubsys.startSend(throttleMessage);
+      canLvChSubsys.startSend(throttleMessage);
     } else {
       int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
       if (delta >= requiredDelta || delta <= -1*requiredDelta) {
         ThrottleMessage throttleMessage(throttleOutputs[1]);
-        canHvChSubsys.startSend(throttleMessage);
+        canLvChSubsys.startSend(throttleMessage);
         prevThrottle = (int32_t)throttleOutputs[1];
       } else {
         ThrottleMessage throttleMessage(prevThrottle);
-        canHvChSubsys.startSend(throttleMessage);
+        canLvChSubsys.startSend(throttleMessage);
       }
     }
 
