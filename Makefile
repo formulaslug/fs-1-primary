@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O2 -ggdb -flto -fomit-frame-pointer -falign-functions=16
+  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16
 endif
 
 # C specific options here (added to USE_OPT).
@@ -71,7 +71,7 @@ endif
 
 # Enables the use of FPU (no, softfp, hard).
 ifeq ($(USE_FPU),)
-  USE_FPU = no
+  USE_FPU = hard
 endif
 
 #
@@ -87,13 +87,14 @@ PROJECT = fs-1-primary
 
 # Imported source files and paths
 CHIBIOS = ChibiOS
+
+# Licensing files.
+include $(CHIBIOS)/os/license/license.mk
 # Startup files.
-# NOTE: Changed from startup_stm32f3xx.mk
 include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk
 # HAL-OSAL files (optional).
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/hal/ports/STM32/STM32F4xx/platform.mk
-# NOTE: Changed from /os/hal/boards/ST_NUCLEO32_F303K8/board.mk
 include $(CHIBIOS)/os/hal/boards/ST_STM32F4_DISCOVERY/board.mk
 include $(CHIBIOS)/os/hal/osal/rt/osal.mk
 # RTOS files (optional).
@@ -101,26 +102,20 @@ include $(CHIBIOS)/os/rt/rt.mk
 include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 # Other files (optional).
 include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
+#include $(CHIBIOS)/test/lib/test.mk
+#include $(CHIBIOS)/test/rt/rt_test.mk
+#include $(CHIBIOS)/test/oslib/oslib_test.mk
 
 # Define linker script file here
-# NOTE: Changed from STM32F303x8.ld
 LDSCRIPT= $(STARTUPLD)/STM32F407xG.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CSRC = $(STARTUPSRC) \
-       $(KERNSRC) \
-       $(PORTSRC) \
-       $(OSALSRC) \
-       $(HALSRC) \
-       $(PLATFORMSRC) \
-       $(BOARDSRC) \
-       $(CHIBIOS)/os/hal/lib/streams/memstreams.c \
-       $(CHIBIOS)/os/hal/lib/streams/chprintf.c
+CSRC = $(ALLCSRC)
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CPPSRC = $(CHCPPSRC) \
+CPPSRC = $(ALLCPPSRC) \
          $(wildcard *.cpp) \
          $(wildcard *.hpp)
 
@@ -145,14 +140,11 @@ TCSRC =
 TCPPSRC =
 
 # List ASM source files here
-ASMSRC =
-ASMXSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
+ASMSRC = $(ALLASMSRC)
+ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(CHIBIOS)/os/license \
-         $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
-         $(HALINC) $(PLATFORMINC) $(BOARDINC) $(CHCPPINC) \
-         $(CHIBIOS)/os/hal/lib/streams \
-         $(CHIBIOS)/os/various
+INCDIR = $(ALLINC) \
+         $(CHIBIOS)/os/hal/lib/streams
 
 #
 # Project, sources and paths
@@ -214,19 +206,18 @@ UINCDIR =
 ULIBDIR =
 
 # List all user libraries here
-ULIBS = -lm -lrdimon
+ULIBS =
 
 #
 # End of user defines
 ##############################################################################
 
 RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
-include $(RULESPATH)/rules.mk
+include rules.mk
 
 .PHONY: upload
 upload: all
 	openocd -s . -f stm32f4discovery_stlink21.cfg -c "program build/$(PROJECT).elf verify reset exit"
-# NOTE ^ changed from openocd -f board/st_nucleo_f4.cfg -c "program build/$(PROJECT).elf verify reset exit"
 
 .PHONY: debug
 debug: all
