@@ -11,7 +11,8 @@ class Event {
     enum Type {
       kNone,
       kCanRx,
-      kTimerTimeout
+      kTimerTimeout,
+      kAdcConversion
     };
 
     Type type = kNone;

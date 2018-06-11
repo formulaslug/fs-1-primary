@@ -11,6 +11,14 @@
 #include "Event.h"
 #include "EventQueue.h"
 
+/**
+ *
+ * CAN subsystem, sitting on top of the chibios CAN driver. Multiple
+ * subsystems can be operating to handle multiple CAN interfaces
+ *
+ * @note Requires that runTxThread() and runRxThread() public member
+ *       functions are called within chibios static threads
+ */
 class CanChSubsys {
   private:
     CanBus& m_canBus;

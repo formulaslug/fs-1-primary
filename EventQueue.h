@@ -20,9 +20,11 @@ class EventQueue {
     EventQueue();
 
     // @brief thread-safe queue pop
+    // TODO: Rename to, correct, dequeue
     Event pop();
 
     // @brief thread-safe queue push
+    // TODO: Rename to, correct, enqueue
     void push(Event e);
 
     // ------------------------ WIP ------------------------

@@ -12,66 +12,33 @@
 #include "Event.h"
 #include "EventQueue.h"
 #include "CanChSubsys.h"
+#include "AdcChSubsys.h"
 
 constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-#define ADC_GRP1_NUM_CHANNELS   2
-#define ADC_GRP1_BUF_DEPTH      8
+// #define ADC_GRP1_NUM_CHANNELS   2
+// #define ADC_GRP1_BUF_DEPTH      8
 
-static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
+// static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
 
 /*
  * ADC streaming callback.
  */
-size_t nx = 0, ny = 0;
-static void adcerrorcallback(ADCDriver *adcp, adcerror_t err) {
-
-  (void)adcp;
-  (void)err;
-}
-
-static void adcendcallback(ADCDriver *adcp, adcsample_t *buffer, size_t n) {
-  (void)adcp;
-  (void)buffer;
-  (void)n;
-  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-      PAL_HIGH);  // IMD
-}
-
-static const ADCConversionGroup adcgrpcfg1 = {
-  FALSE,
-  ADC_GRP1_NUM_CHANNELS,
-  adcendcallback,
-  adcerrorcallback,
-  0,                        /* CR1 */
-  ADC_CR2_SWSTART,          /* CR2 */
-  // SMPR1: Samples times for channels 10-17
-  0,
-  // SMPR2: Samples times for channels 0-9
-  // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-  // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-  ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-  0,                        /* SQR1 */
-  0,                        /* SQR2 */
-  // SQR1: Conversion group sequence 1-6
-  // @brief specify which channels, in which order, are sampled per
-  //        conversion sequence
-  // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-  //       ADC_CHANNEL_IN[Y]
-  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-};
-
-// TODO: test brake and throttle together
-
-// STEERING_VALUE_PIN -> ADC12_IN6 (POT 1)
+// size_t nx = 0, ny = 0;
+// static void adcerrorcallback(ADCDriver *adcp, adcerror_t err) {
 //
-// BRAKE_VALUE_PIN -> ADC123_IN1 (POT 2)
-//
-// RIGHT_THROTTLE_PIN -> ADC123_IN2 (POT 1)
-//
-// LEFT_THROTTLE_PIN -> ADC123_IN3 (POT 1)
+//   (void)adcp;
+//   (void)err;
+// }
 
+// static void adcendcallback(ADCDriver *adcp, adcsample_t *buffer, size_t n) {
+//   (void)adcp;
+//   (void)buffer;
+//   (void)n;
+//   palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+//       PAL_HIGH);  // IMD
+// }
 
 /*
  * If the range is ordered as (min, max), minimum input values map to 0.
@@ -127,8 +94,8 @@ static THD_FUNCTION(heartbeatLvThreadFunc, canChSubsys) {
 //   }
 // }
 
-/*
- * CAN TX/RX threads for subsystem
+/**
+ * CAN TX/RX, LV/HV subsystem threads
  */
 static THD_WORKING_AREA(canTxLvThreadFuncWa, 128);
 static THD_FUNCTION(canTxLvThreadFunc, canChSubsys) {
@@ -154,6 +121,15 @@ static THD_FUNCTION(canRxHvThreadFunc, canChSubsys) {
   static_cast<CanChSubsys*>(canChSubsys)->runRxThread();
 }
 
+/**
+ * ADC subsystem thread
+ */
+static THD_WORKING_AREA(adcThreadFuncWa, 128);
+static THD_FUNCTION(adcThreadFunc, adcChSubsys) {
+  chRegSetThreadName("CAN RX HV");
+  static_cast<AdcChSubsys*>(adcChSubsys)->runThread();
+}
+
 int main() {
   /*
    * System initializations.
@@ -164,17 +140,13 @@ int main() {
    */
   halInit();
   chSysInit();
-  // TODO: remember these are commented out
-  adcStart(&ADCD1, NULL);
-  adcStart(&ADCD2, NULL);
-  adcStart(&ADCD3, NULL);
 
   // Pin initialization
   // Analog inputs
-  palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
-  palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
-  palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
-  palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
+  // palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
+  // palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
+  // palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
+  // palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
   // Digital inputs
   palSetPadMode(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN,
       PAL_MODE_INPUT_PULLUP);  // IMD
@@ -195,22 +167,24 @@ int main() {
       PAL_MODE_OUTPUT_PUSHPULL);  // RTDS signal
   palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
       PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
+  palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
 
   // Init LED states to LOW (including faults)
-  palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN, PAL_LOW);
-  palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN, PAL_LOW);
-  palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN, PAL_LOW);
-  palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN, PAL_LOW);
-  palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN, PAL_LOW);
+  palClearPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);
+  palClearPad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN);
+  palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);
+  palClearPad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN);
+  palClearPad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
+  palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+
 
   // TODO: implement vehicle singleton
   Vehicle vehicle;
 
-  // CanBus canBus(kNodeIdPrimary, &CAND1, CanBusBaudRate::k500k, false);
   CanBus canBusLv(kNodeIdPrimary, &CAND1, CanBusBaudRate::k1M, false);
   chibios_rt::Mutex canBusLvMut;
 
-  // CanBus canBusHV(kNodeIdPrimary, &CAND2, CanBusBaudRate::k500k, false);
   CanBus canBusHv(kNodeIdPrimary, &CAND2, CanBusBaudRate::k1M, false);
   chibios_rt::Mutex canBusHvMut;
 
@@ -241,12 +215,18 @@ int main() {
   }
 
 
-  /*
+  /**
    * Create subsystems
+   * @note Subsystems DO NOT RUN unless their run function(s) is/are
+   *       called within static threads
    */
   EventQueue fsmEventQueue = EventQueue();
+
   CanChSubsys canLvChSubsys = CanChSubsys(canBusLv, canBusLvMut, fsmEventQueue);
   CanChSubsys canHvChSubsys = CanChSubsys(canBusHv, canBusHvMut, fsmEventQueue);
+
+  AdcChSubsys adcChSubsys = AdcChSubsys(fsmEventQueue);
+  adcChSubsys.addPin(AdcChSubsys::Gpio::kA1, 5); // add brake input
 
   /*
    * Create threads (many of which are driving subsystems)
@@ -265,6 +245,8 @@ int main() {
                     NORMALPRIO, canRxHvThreadFunc, &canHvChSubsys);
   // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
   //                   throttleThreadFunc, &canHvChSubsys);
+  chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa),
+                    NORMALPRIO, adcThreadFunc, &adcChSubsys);
 
 
 
@@ -290,10 +272,50 @@ int main() {
       // indicate received message
       palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
           PAL_HIGH);  // IMD
-      palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-          PAL_HIGH);  // AMS
-      palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-          PAL_HIGH);  // BSPD
+
+      Event e = fsmEventQueue.pop();
+
+      if (e.type == Event::kAdcConversion) {
+        palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+            PAL_HIGH);  // AMS
+        palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+            PAL_HIGH);  // BSPD
+
+        // adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
+
+        // scaling to be from vref of 2.9V (as it appears Vdd is staying
+        // around on the discovery board when powered over USB)
+        // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
+
+        // fetch new input
+        throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & e.params.back());
+
+        // shift outputs
+        throttleOutputs[0] = throttleOutputs[1];
+
+        // y(n) = y(n-1) + x(n)/N - x(n-N)/N
+        uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
+        throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
+
+        if (throttleOutputs[1] < 130) {
+          ThrottleMessage throttleMessage(0);
+          canLvChSubsys.startSend(throttleMessage);
+        } else {
+          int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
+          if (delta >= requiredDelta || delta <= -1*requiredDelta) {
+            ThrottleMessage throttleMessage(throttleOutputs[1]);
+            canLvChSubsys.startSend(throttleMessage);
+            prevThrottle = (int32_t)throttleOutputs[1];
+          } else {
+            ThrottleMessage throttleMessage(prevThrottle);
+            canLvChSubsys.startSend(throttleMessage);
+          }
+        }
+
+        // increment current index in circular buffer
+        currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
+      }
+
     }
 
     // read all digital inputs
@@ -302,39 +324,39 @@ int main() {
     // auto driveModeButton = palReadPad(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN);
     // auto bspdFault = palReadPad(BSPD_FAULT_PORT, BSPD_FAULT_PIN);
 
-    adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
-
-    // scaling to be from vref of 2.9V (as it appears Vdd is staying
-    // around on the discovery board when powered over USB)
-    // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
-
-    // fetch new input
-    throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & samples1[1]);
-
-    // shift outputs
-    throttleOutputs[0] = throttleOutputs[1];
-
-    // y(n) = y(n-1) + x(n)/N - x(n-N)/N
-    uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
-    throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
-
-    if (throttleOutputs[1] < 130) {
-      ThrottleMessage throttleMessage(0);
-      canLvChSubsys.startSend(throttleMessage);
-    } else {
-      int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
-      if (delta >= requiredDelta || delta <= -1*requiredDelta) {
-        ThrottleMessage throttleMessage(throttleOutputs[1]);
-        canLvChSubsys.startSend(throttleMessage);
-        prevThrottle = (int32_t)throttleOutputs[1];
-      } else {
-        ThrottleMessage throttleMessage(prevThrottle);
-        canLvChSubsys.startSend(throttleMessage);
-      }
-    }
-
-    // increment current index in circular buffer
-    currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
+    // adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
+    //
+    // // scaling to be from vref of 2.9V (as it appears Vdd is staying
+    // // around on the discovery board when powered over USB)
+    // // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
+    //
+    // // fetch new input
+    // throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & samples1[1]);
+    //
+    // // shift outputs
+    // throttleOutputs[0] = throttleOutputs[1];
+    //
+    // // y(n) = y(n-1) + x(n)/N - x(n-N)/N
+    // uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
+    // throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
+    //
+    // if (throttleOutputs[1] < 130) {
+    //   ThrottleMessage throttleMessage(0);
+    //   canLvChSubsys.startSend(throttleMessage);
+    // } else {
+    //   int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
+    //   if (delta >= requiredDelta || delta <= -1*requiredDelta) {
+    //     ThrottleMessage throttleMessage(throttleOutputs[1]);
+    //     canLvChSubsys.startSend(throttleMessage);
+    //     prevThrottle = (int32_t)throttleOutputs[1];
+    //   } else {
+    //     ThrottleMessage throttleMessage(prevThrottle);
+    //     canLvChSubsys.startSend(throttleMessage);
+    //   }
+    // }
+    //
+    // // increment current index in circular buffer
+    // currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
 
 #if 0
     // reflect button states on LEDs
