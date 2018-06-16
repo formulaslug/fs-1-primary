@@ -20,7 +20,7 @@
 class AdcChSubsys {
  public:
   enum class Gpio {
-    kA1,
+    kA1 = 0,
     kA2,
     kA3,
     kA6
@@ -51,7 +51,8 @@ class AdcChSubsys {
   /**
    * What SHOULD be private (need to figure out callback)
    */
-  static constexpr uint32_t kNumGpio = 4;
+  static constexpr uint32_t kNumGpio = 2;
+  static constexpr uint32_t kMaxNumGpio = 4;
   static constexpr uint32_t kSampleBuffDepth = 8;
   EventQueue& m_eventQueue;
   ADCConversionGroup m_adcConversionGroup;
@@ -67,7 +68,8 @@ class AdcChSubsys {
 
  private:
   // states of all available analog pins
-  bool m_pins[kNumGpio] = { false, false, false, false };
+  // bool m_pins[kNumGpio] = { false, false};
+  bool m_pins[4] = { false, false, false, false };
   uint8_t m_numPins = 0;
   bool m_subsysActive = false;
 
@@ -89,10 +91,10 @@ class AdcChSubsys {
    */
 
   // map user's Gpio pin to a pin integer
-  static constexpr int32_t kPinMap[] = { 1, 2, 3, 6 };
+  int32_t kPinMap[kMaxNumGpio] = { 1, 2, 3, 6 };
 
   // map user's Gpio pin to a chibios channel number
-  static constexpr int32_t kChannelMap[] = {
+  int32_t kChannelMap[kMaxNumGpio] = {
     ADC_CHANNEL_IN1,
     ADC_CHANNEL_IN2,
     ADC_CHANNEL_IN3,
@@ -100,7 +102,7 @@ class AdcChSubsys {
   };
 
   // map user's Gpio pin to chibios port pointer
-  static constexpr stm32_gpio_t* kPortMap[] = {
+  stm32_gpio_t* kPortMap[kMaxNumGpio] = {
     GPIOA,
     GPIOA,
     GPIOA,

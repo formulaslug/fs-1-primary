@@ -4,59 +4,61 @@
 #include "Event.h"
 #include "mcuconfFs.h"
 
-// static virtual_timer_t vSampleClk;
-static const ADCConversionGroup g_adcConversionGroup = {
-  FALSE,
-  2,
-  NULL,
-  NULL,
-  0,                        /* CR1 */
-  ADC_CR2_SWSTART,          /* CR2 */
-  // SMPR1: Samples times for channels 10-17
-  0,
-  // SMPR2: Samples times for channels 0-9
-  // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-  // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-  // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-  ADC_SMPR2_SMP_AN1(ADC_SAMPLE_3) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_3),
-  0,                        /* SQR1 */
-  0,                        /* SQR2 */
-  // SQR1: Conversion group sequence 1-6
-  // @brief specify which channels, in which order, are sampled per
-  //        conversion sequence
-  // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-  //       ADC_CHANNEL_IN[Y]
-  ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-  // // use a circular buffer
-  // false,
-  // // num channels
-  // 1,
-  // // end conversion callback
-  // NULL,
-  // // error callback
-  // NULL,
-  // // CR1 register config
-  // 0,
-  // // CR2 register config
-  // ADC_CR2_SWSTART,
-  // // SMPR1: Samples times for channels 10-17
-  // 0,
-  // // SMPR2: Samples times for channels 0-9
-  // // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-  // // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-  // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480),// | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-  // // SQR1 register config
-  // 0,
-  // // SQR2
-  // 0,
-  // // SQR1: Conversion group sequence 1-6
-  // // @brief specify which channels, in which order, are sampled per
-  // //        conversion sequence
-  // // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-  // //       ADC_CHANNEL_IN[Y]
-  // ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1)// | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-};
-static adcsample_t g_samples[2 * 8];
+// NOTE: Needed to use threads instead of virtual timers to meet
+//       ChibiOS API reqs...
+// static adcsample_t g_samples[2 * 8];
+// static const ADCConversionGroup g_adcConversionGroup = {
+//   FALSE,
+//   2,
+//   NULL,
+//   NULL,
+//   0,                        #<{(| CR1 |)}>#
+//   ADC_CR2_SWSTART,          #<{(| CR2 |)}>#
+//   // SMPR1: Samples times for channels 10-17
+//   0,
+//   // SMPR2: Samples times for channels 0-9
+//   // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+//   // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+//   // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+//   ADC_SMPR2_SMP_AN1(ADC_SAMPLE_3) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_3),
+//   0,                        #<{(| SQR1 |)}>#
+//   0,                        #<{(| SQR2 |)}>#
+//   // SQR1: Conversion group sequence 1-6
+//   // @brief specify which channels, in which order, are sampled per
+//   //        conversion sequence
+//   // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+//   //       ADC_CHANNEL_IN[Y]
+//   ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+//   // // use a circular buffer
+//   // false,
+//   // // num channels
+//   // 1,
+//   // // end conversion callback
+//   // NULL,
+//   // // error callback
+//   // NULL,
+//   // // CR1 register config
+//   // 0,
+//   // // CR2 register config
+//   // ADC_CR2_SWSTART,
+//   // // SMPR1: Samples times for channels 10-17
+//   // 0,
+//   // // SMPR2: Samples times for channels 0-9
+//   // // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+//   // // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+//   // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480),// | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+//   // // SQR1 register config
+//   // 0,
+//   // // SQR2
+//   // 0,
+//   // // SQR1: Conversion group sequence 1-6
+//   // // @brief specify which channels, in which order, are sampled per
+//   // //        conversion sequence
+//   // // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+//   // //       ADC_CHANNEL_IN[Y]
+//   // ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1)// | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+// };
+
 
 // TODO: Test system with all four ADC inputs
 // BRAKE_VALUE_PIN -> ADC123_IN1 (POT 2)
@@ -68,40 +70,31 @@ static adcsample_t g_samples[2 * 8];
 // STEERING_VALUE_PIN -> ADC12_IN6 (POT 1)
 
 AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
+  // update the conversion group configuration
+  m_adcConversionGroup = {
+    FALSE,
+    2,
+    NULL,
+    NULL,
+    0,                        /* CR1 */
+    ADC_CR2_SWSTART,          /* CR2 */
+    // SMPR1: Samples times for channels 10-17
+    0,
+    // SMPR2: Samples times for channels 0-9
+    // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+    // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+    // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+    ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+    0,                        /* SQR1 */
+    0,                        /* SQR2 */
+    // SQR1: Conversion group sequence 1-6
+    // @brief specify which channels, in which order, are sampled per
+    //        conversion sequence
+    // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+    //       ADC_CHANNEL_IN[Y]
+    ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+  };
 }
-
-// @NOTE Removed in exchange for thread that can run blocking code
-// void sampleClkCallback(void *p) {
-//   // get reference to self
-//   auto _this = static_cast<AdcChSubsys*>(p);
-//
-//   if (_this->m_ledOn) {
-//     palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-//     _this->m_ledOn = false;
-//   } else {
-//     palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-//     _this->m_ledOn = true;
-//   }
-//
-//   // Make the conversion
-//   // NOTE: Hard-coded to ADC Driver 1 only
-//   // adcConvert(&ADCD1, &(_this->m_adcConversionGroup), _this->m_samples,
-//   //     _this->kSampleBuffDepth);
-//   // adcConvert(&ADCD1, &g_adcConversionGroup, g_samples,
-//   //     _this->kSampleBuffDepth);
-//   adcConvert(&ADCD1, &g_adcConversionGroup, g_samples, 8);
-//
-//   // // post event
-//   // Event e = Event();
-//   // e.type = Event::kAdcConversion;
-//   // e.params.push_back(_this->m_samples[0]);
-//   // _this->m_eventQueue.push(e);
-//
-//   // restart virtual timer
-//   chSysLockFromISR();
-//   chVTSetI(&vSampleClk, _this->samplePeriodCycles(), sampleClkCallback, p);
-//   chSysUnlockFromISR();
-// }
 
 bool AdcChSubsys::addPin(AdcChSubsys::Gpio pin,
     uint32_t samplingFrequency) {
@@ -111,6 +104,31 @@ bool AdcChSubsys::addPin(AdcChSubsys::Gpio pin,
   // set the pin mode
   palSetPadMode(kPortMap[static_cast<uint32_t>(pin)],
       kPinMap[static_cast<uint32_t>(pin)], PAL_MODE_INPUT_ANALOG);
+
+  // update the conversion group configuration
+  m_adcConversionGroup = {
+    FALSE,
+    2,
+    NULL,
+    NULL,
+    0,                        /* CR1 */
+    ADC_CR2_SWSTART,          /* CR2 */
+    // SMPR1: Samples times for channels 10-17
+    0,
+    // SMPR2: Samples times for channels 0-9
+    // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+    // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+    // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+    ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+    0,                        /* SQR1 */
+    0,                        /* SQR2 */
+    // SQR1: Conversion group sequence 1-6
+    // @brief specify which channels, in which order, are sampled per
+    //        conversion sequence
+    // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+    //       ADC_CHANNEL_IN[Y]
+    ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+  };
 
   // add the pin internally
   m_pins[static_cast<uint32_t>(pin)] = true;
@@ -139,17 +157,13 @@ void AdcChSubsys::runThread() {
 
     // Make the conversion
     // NOTE: Hard-coded to ADC Driver 1 only
-    // adcConvert(&ADCD1, &(_this->m_adcConversionGroup), _this->m_samples,
-    //     _this->kSampleBuffDepth);
-    // adcConvert(&ADCD1, &g_adcConversionGroup, g_samples,
-    //     _this->kSampleBuffDepth);
-    // !!!This one
-    adcConvert(&ADCD1, &g_adcConversionGroup, g_samples, 8);
+    adcConvert(&ADCD1, &m_adcConversionGroup, m_samples, kSampleBuffDepth);
 
     // post event
     Event e = Event();
     e.type = Event::kAdcConversion;
-    e.params.push_back(g_samples[0]);
+    e.params.push_back(m_samples[1]);
+    e.params.push_back(m_samples[0]);
     m_eventQueue.push(e);
 
     // restart timer
@@ -168,50 +182,11 @@ bool AdcChSubsys::removePin(AdcChSubsys::Gpio pin) {
 
 // TODO: implement full subsystem, then implement pin adding
 void AdcChSubsys::start() {
-  // initialize conversion group config
-  // m_adcConversionGroup = {
-  // g_adcConversionGroup = {
-  //   // use a circular buffer
-  //   false,
-  //   // num channels
-  //   m_numPins,
-  //   // end conversion callback
-  //   NULL,
-  //   // error callback
-  //   NULL,
-  //   // CR1 register config
-  //   0,
-  //   // CR2 register config
-  //   ADC_CR2_SWSTART,
-  //   // SMPR1: Samples times for channels 10-17
-  //   0,
-  //   // SMPR2: Samples times for channels 0-9
-  //   // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-  //   // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-  //   ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480),// | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-  //   // SQR1 register config
-  //   0,
-  //   // SQR2
-  //   0,
-  //   // SQR1: Conversion group sequence 1-6
-  //   // @brief specify which channels, in which order, are sampled per
-  //   //        conversion sequence
-  //   // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-  //   //       ADC_CHANNEL_IN[Y]
-  //   ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1)// | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-  // };
-
   // start ADC
   // TODO: only start those that are required for given pins
   adcStart(&ADCD1, NULL);
   adcStart(&ADCD2, NULL);
   adcStart(&ADCD3, NULL);
-
-  // @NOTE: dropped virtual timer for thread that sleeps in order to
-  //        run blocking ADC conversion
-  // start the virtual timer
-  // chVTSet(&vSampleClk, samplePeriodCycles(), sampleClkCallback, this);
-  // chVTSet(&m_vSampleClk, samplePeriodCycles(), AdcChSubsys::sampleClkCallback, this);
 
   m_subsysActive = true;
 }

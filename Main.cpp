@@ -227,6 +227,7 @@ int main() {
 
   AdcChSubsys adcChSubsys = AdcChSubsys(fsmEventQueue);
   adcChSubsys.addPin(AdcChSubsys::Gpio::kA1, 5); // add brake input
+  adcChSubsys.addPin(AdcChSubsys::Gpio::kA2, 5); // add throttle input
 
   /*
    * Create threads (many of which are driving subsystems)
@@ -288,7 +289,8 @@ int main() {
         // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
 
         // fetch new input
-        throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & e.params.back());
+        // throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & e.getParam(static_cast<uint32_t>(AdcChSubsys::Gpio::kA1)));
+        throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & e.params.front());
 
         // shift outputs
         throttleOutputs[0] = throttleOutputs[1];
