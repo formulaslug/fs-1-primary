@@ -62,7 +62,6 @@ class AdcChSubsys {
   float m_sampleClkHz = 100; // default of 100Hz
   uint32_t m_sampleClkMs = 1;
   systime_t samplePeriodCycles();
-  // uint32_t samplePeriodCycles();
 
   bool m_ledOn = false;
 
@@ -107,5 +106,28 @@ class AdcChSubsys {
     GPIOA,
     GPIOA,
     GPIOA
+  };
+
+  // map user's Gpio pin to a sample time macro from chibios
+  uint32_t kSampleChargeTimeMap[kMaxNumGpio] = {
+    ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480),
+    ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+    ADC_SMPR2_SMP_AN3(ADC_SAMPLE_480),
+    ADC_SMPR2_SMP_AN4(ADC_SAMPLE_480)
+  };
+
+  /**
+   *
+   * Map user's Gpio pin to a conversion sequence number macro from
+   *
+   * @note Each added pin will have one slot in the conversion sequence
+   * @note Channel numbers map directly to the pins and which ADC
+   *       channels they can be read from
+   */
+  uint32_t kConversionSequenceMap[kMaxNumGpio] = {
+    ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1),
+    ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2),
+    ADC_SQR3_SQ3_N(ADC_CHANNEL_IN3),
+    ADC_SQR3_SQ4_N(ADC_CHANNEL_IN6)
   };
 };

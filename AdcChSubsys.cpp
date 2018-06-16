@@ -73,7 +73,7 @@ AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
   // update the conversion group configuration
   m_adcConversionGroup = {
     FALSE,
-    2,
+    0,
     NULL,
     NULL,
     0,                        /* CR1 */
@@ -84,7 +84,7 @@ AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
     // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
     // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
     // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-    ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+    0, //ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
     0,                        /* SQR1 */
     0,                        /* SQR2 */
     // SQR1: Conversion group sequence 1-6
@@ -92,7 +92,7 @@ AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
     //        conversion sequence
     // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
     //       ADC_CHANNEL_IN[Y]
-    ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+    0 //ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
   };
 }
 
@@ -106,29 +106,36 @@ bool AdcChSubsys::addPin(AdcChSubsys::Gpio pin,
       kPinMap[static_cast<uint32_t>(pin)], PAL_MODE_INPUT_ANALOG);
 
   // update the conversion group configuration
-  m_adcConversionGroup = {
-    FALSE,
-    2,
-    NULL,
-    NULL,
-    0,                        /* CR1 */
-    ADC_CR2_SWSTART,          /* CR2 */
-    // SMPR1: Samples times for channels 10-17
-    0,
-    // SMPR2: Samples times for channels 0-9
-    // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-    // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-    // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-    ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-    0,                        /* SQR1 */
-    0,                        /* SQR2 */
-    // SQR1: Conversion group sequence 1-6
-    // @brief specify which channels, in which order, are sampled per
-    //        conversion sequence
-    // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-    //       ADC_CHANNEL_IN[Y]
-    ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-  };
+  // increment the number of channels
+  m_adcConversionGroup.num_channels += 1;
+  // add sample charge time config
+  m_adcConversionGroup.smpr2 |= kSampleChargeTimeMap[static_cast<uint32_t>(pin)];
+  // add conversion sequence config
+  m_adcConversionGroup.sqr3 |= kConversionSequenceMap[static_cast<uint32_t>(pin)];
+
+  // m_adcConversionGroup = {
+  //   FALSE,
+  //   2,
+  //   NULL,
+  //   NULL,
+  //   0,                        #<{(| CR1 |)}>#
+  //   ADC_CR2_SWSTART,          #<{(| CR2 |)}>#
+  //   // SMPR1: Samples times for channels 10-17
+  //   0,
+  //   // SMPR2: Samples times for channels 0-9
+  //   // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+  //   // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+  //   // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+  //   ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+  //   0,                        #<{(| SQR1 |)}>#
+  //   0,                        #<{(| SQR2 |)}>#
+  //   // SQR1: Conversion group sequence 1-6
+  //   // @brief specify which channels, in which order, are sampled per
+  //   //        conversion sequence
+  //   // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+  //   //       ADC_CHANNEL_IN[Y]
+  //   ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+  // };
 
   // add the pin internally
   m_pins[static_cast<uint32_t>(pin)] = true;
