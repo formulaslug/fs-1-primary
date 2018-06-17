@@ -51,12 +51,12 @@ void CanChSubsys::runRxThread() {
       m_canBus.processRxMessages();
     }
     // generate events from any received messages
-    CANRxFrame msg;
+    // CANRxFrame msg;
     while (m_canBus.rxQueueSize() > 0) {
       // get CAN message
-      msg = m_canBus.dequeueRxMessage();
+      CANRxFrame msg = m_canBus.dequeueRxMessage();
       // create event
-      std::array<uint32_t, 8> frame;
+      std::array<uint16_t, 8> frame = {0,0,0,0,0,0,0,0};
       // Event e = Event();
       // write data bytes to event params
       for (int i = 0; i < 8; i++) {
@@ -65,9 +65,9 @@ void CanChSubsys::runRxThread() {
         frame[i] = msg.data8[i];
       }
       // write COBID to event params
-      // e.params.push_back(msg.EID);
       palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
       Event e = Event(Event::Type::kCanRx, msg.EID, frame);
+      // Event e = Event(Event::Type::kCanRx, msg.EID, frame[0]);
       // push event
       // m_eventQueue.push(e);
       m_eventQueue.push(e);

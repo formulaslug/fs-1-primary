@@ -276,8 +276,10 @@ int main() {
       if (e.type() == Event::Type::kCanRx) {
         palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
             PAL_HIGH);  // IMD
-        std::array<uint32_t, 8> canFrame = e.canFrame();
+        std::array<uint16_t, 8> canFrame = e.canFrame();
         uint32_t canEid = e.canEid();
+        // TODO: test with actual payload to verify integrity through
+        //       system (EID is confirm)
         ThrottleMessage throttleMessage(0x3000 | canEid);
         canLvChSubsys.startSend(throttleMessage);
       } else if (e.type() == Event::Type::kAdcConversion) {

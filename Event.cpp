@@ -8,13 +8,12 @@ Event::Event(Type t, Gpio adcPin, uint32_t adcValue) : m_type(t) {
   m_params[0] = static_cast<uint32_t>(adcPin);
   m_params[1] = adcValue;
 }
-Event::Event(Type t, uint32_t canEid, std::array<uint32_t, 8> canFrame) : m_type(t) {
+Event::Event(Type t, uint32_t canEid, std::array<uint16_t, 8> canFrame) : m_type(t) {
   m_params[0] = canEid;
 
   // set data frame (max 8 bytes)
-  // for (int i = 0; i < 8; i++) {
-  //   m_params[1 + i] = canFrame[i];
-  // }
+  std::copy(canFrame.begin() + 1, canFrame.begin() + 1 + 8,
+      m_params.begin() + 1);
 }
 
 Event::Type Event::type() {
@@ -22,10 +21,11 @@ Event::Type Event::type() {
 }
 
 /**
- * @note Due to a terrible, terrible machine with no time to upgrade
- *       the toolchain for (no std::variant), the following
- *       member function implementation are, essentially, supporting
- *       c-style polymorphism
+ * @note Due to a terrible, terrible machine, for which there's no
+ *       time to upgrade the toolchain, the toolchain for
+ *       (no std::variant), the following member function
+ *       implementation are, essentially, supporting c-style
+ *       polymorphism
  */
 
 // ADC event member functions
@@ -36,11 +36,11 @@ uint32_t Event::adcValue() { return m_params[1]; }
 // CAN event member functions
 uint32_t Event::canEid() { return m_params[0]; }
 
-std::array<uint32_t, 8> Event::canFrame() {
-  std::array<uint32_t, 8> frame = {0,0,0,0,0,0,0,0};
+std::array<uint16_t, 8> Event::canFrame() {
+  std::array<uint16_t, 8> frame;
 
-  // std::copy(m_params.begin() + 1, m_params.begin() + 1 + 8,
-  //     frame.begin());
+  std::copy(m_params.begin() + 1, m_params.begin() + 1 + 8,
+      frame.begin());
 
   return frame;
 }

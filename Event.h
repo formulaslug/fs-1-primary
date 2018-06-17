@@ -18,7 +18,8 @@ class Event {
     };
 
     Event(Type t, Gpio adcPin, uint32_t adcValue);
-    Event(Type t, uint32_t canEid, std::array<uint32_t, 8> canFrame);
+    Event(Type t, uint32_t canEid, std::array<uint16_t, 8> canFrame);
+    // Event(Type t, uint32_t canEid, uint32_t canFrame);
     Event();
 
     Type type();
@@ -27,14 +28,16 @@ class Event {
     Gpio adcPin();
     uint32_t adcValue();
     uint32_t canEid();
-    std::array<uint32_t, 8> canFrame();
+    std::array<uint16_t, 8> canFrame();
 
 
   private:
     Type m_type = kNone;
 
-    // TODO: implement a better mechanism for storing abitrary data
-    //       in event param. Should probably statically allocate event
-    //       param memory, then read/write in polymorphic manner
-    std::array<uint32_t, 10> m_params;
+    /**
+     * @note Allocation of 320 bytes (10 32 bit integers), of course,
+     *       overflows a 128 byte static thread workspace and breaks
+     *       the kernel. Be careful with static thread workspace
+     */
+    std::array<uint16_t, 10> m_params;
 };

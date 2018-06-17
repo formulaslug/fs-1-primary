@@ -18,6 +18,9 @@
  *
  * @note Requires that runTxThread() and runRxThread() public member
  *       functions are called within chibios static threads
+ *
+ * TODO: Need to test payload integrity, temp system prototype is
+ *       currently broken and need to test with the new PCB
  */
 class CanChSubsys {
   private:
