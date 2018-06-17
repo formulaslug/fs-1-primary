@@ -54,7 +54,7 @@ class AdcChSubsys {
   adcsample_t m_samples[kNumGpio * kSampleBuffDepth];
   // runs at the fastest sampling frequency of all analog inputs
   float m_sampleClkHz = 100; // default of 100Hz
-  uint32_t m_sampleClkMs = 2;
+  uint32_t m_sampleClkMs = 100;
   systime_t samplePeriodCycles();
 
   bool m_ledOn = false;

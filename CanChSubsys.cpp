@@ -56,16 +56,13 @@ void CanChSubsys::runRxThread() {
       // get CAN message
       msg = m_canBus.dequeueRxMessage();
       // create event
-      std::array<int32_t, 8> frame;
+      std::array<uint32_t, 8> frame;
       // Event e = Event();
       // write data bytes to event params
-      // TODO: just switch to c-style iteration, since using an array now
-      while (msg.DLC > 0) {
+      for (int i = 0; i < 8; i++) {
         // pushing data bytes to event param vector in reverse order,
         // such that popping off stack will result in correct order
-        // e.params.push_back(msg.data8[msg.DLC - 1]);
-        frame[msg.DLC - 1] = msg.data8[msg.DLC - 1];
-        msg.DLC--;
+        frame[i] = msg.data8[i];
       }
       // write COBID to event params
       // e.params.push_back(msg.EID);

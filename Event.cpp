@@ -8,7 +8,7 @@ Event::Event(Type t, Gpio adcPin, uint32_t adcValue) : m_type(t) {
   m_params[0] = static_cast<uint32_t>(adcPin);
   m_params[1] = adcValue;
 }
-Event::Event(Type t, uint32_t canEid, std::array<int32_t, 8> canFrame) : m_type(t) {
+Event::Event(Type t, uint32_t canEid, std::array<uint32_t, 8> canFrame) : m_type(t) {
   m_params[0] = canEid;
 
   // set data frame (max 8 bytes)
@@ -36,8 +36,8 @@ uint32_t Event::adcValue() { return m_params[1]; }
 // CAN event member functions
 uint32_t Event::canEid() { return m_params[0]; }
 
-std::array<int32_t, 8> Event::canFrame() {
-  std::array<int32_t, 8> frame = {0,0,0,0,0,0,0,0};
+std::array<uint32_t, 8> Event::canFrame() {
+  std::array<uint32_t, 8> frame = {0,0,0,0,0,0,0,0};
 
   // std::copy(m_params.begin() + 1, m_params.begin() + 1 + 8,
   //     frame.begin());

@@ -273,7 +273,14 @@ int main() {
 
       Event e = fsmEventQueue.pop();
 
-      if (e.type() == Event::Type::kAdcConversion) {
+      if (e.type() == Event::Type::kCanRx) {
+        palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+            PAL_HIGH);  // IMD
+        std::array<uint32_t, 8> canFrame = e.canFrame();
+        uint32_t canEid = e.canEid();
+        ThrottleMessage throttleMessage(0x3000 | canEid);
+        canLvChSubsys.startSend(throttleMessage);
+      } else if (e.type() == Event::Type::kAdcConversion) {
         // indicate received message
         if (e.adcPin() == Gpio::kA1) {
           palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
