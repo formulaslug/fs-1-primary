@@ -19,40 +19,17 @@
 constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-static virtual_timer_t vtLedBspd, vtLedImd;
+static virtual_timer_t vtLedBspd, vtLedStartup;
 
 static void ledBspdOff(void *p) {
   (void)p;
   palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
 }
 
-static void ledImdOff(void *p) {
+static void ledStartupOff(void *p) {
   (void)p;
-  palClearPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);  // IMD
+  palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
 }
-
-// #define ADC_GRP1_NUM_CHANNELS   2
-// #define ADC_GRP1_BUF_DEPTH      8
-
-// static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
-
-/*
- * ADC streaming callback.
- */
-// size_t nx = 0, ny = 0;
-// static void adcerrorcallback(ADCDriver *adcp, adcerror_t err) {
-//
-//   (void)adcp;
-//   (void)err;
-// }
-
-// static void adcendcallback(ADCDriver *adcp, adcsample_t *buffer, size_t n) {
-//   (void)adcp;
-//   (void)buffer;
-//   (void)n;
-//   palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-//       PAL_HIGH);  // IMD
-// }
 
 /*
  * If the range is ordered as (min, max), minimum input values map to 0.
@@ -296,20 +273,19 @@ int main() {
       Event e = fsmEventQueue.pop();
 
       if (e.type() == Event::Type::kDigInTransition) {
+        palSetPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
         switch (e.digInState()) {
           case true:
             // rising edge
             // flash BSPD LED quickly
-            palSetPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
             chVTReset(&vtLedBspd);
-            chVTSet(&vtLedBspd, TIME_MS2I(100), ledBspdOff, NULL);
+            chVTSet(&vtLedBspd, TIME_MS2I(200), ledBspdOff, NULL);
             break;
           case false:
             // falling edge
             // flash BSPD LED slowly
-            palSetPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);  // IMD
-            chVTReset(&vtLedImd);
-            chVTSet(&vtLedImd, TIME_MS2I(100), ledImdOff, NULL);
+            chVTReset(&vtLedBspd);
+            chVTSet(&vtLedBspd, TIME_MS2I(50), ledBspdOff, NULL);
             break;
         }
       } else if (e.type() == Event::Type::kCanRx) {
@@ -317,7 +293,12 @@ int main() {
         uint32_t canEid = e.canEid();
 
         // handle packet types
-        switch (canEid) {
+        switch (canEid & kNodeIdMask) {
+          case kNodeIdCellTemp:
+            palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+            chVTReset(&vtLedStartup);
+            chVTSet(&vtLedStartup, TIME_MS2I(50), ledStartupOff, NULL);
+            break;
           default:
             break;
         }
