@@ -12,7 +12,7 @@ Event::Event(Type t, uint32_t canEid, std::array<uint16_t, 8> canFrame) : m_type
   m_params[0] = canEid;
 
   // set data frame (max 8 bytes)
-  std::copy(canFrame.begin() + 1, canFrame.begin() + 1 + 8,
+  std::copy(canFrame.begin(), canFrame.begin() + 8,
       m_params.begin() + 1);
 }
 
@@ -37,7 +37,7 @@ uint32_t Event::adcValue() { return m_params[1]; }
 uint32_t Event::canEid() { return m_params[0]; }
 
 std::array<uint16_t, 8> Event::canFrame() {
-  std::array<uint16_t, 8> frame;
+  std::array<uint16_t, 8> frame = {0,0,0,0,0,0,0,0};
 
   std::copy(m_params.begin() + 1, m_params.begin() + 1 + 8,
       frame.begin());

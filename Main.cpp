@@ -274,14 +274,15 @@ int main() {
       Event e = fsmEventQueue.pop();
 
       if (e.type() == Event::Type::kCanRx) {
-        palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-            PAL_HIGH);  // IMD
         std::array<uint16_t, 8> canFrame = e.canFrame();
         uint32_t canEid = e.canEid();
-        // TODO: test with actual payload to verify integrity through
-        //       system (EID is confirm)
-        ThrottleMessage throttleMessage(0x3000 | canEid);
-        canLvChSubsys.startSend(throttleMessage);
+        if (canEid == 0x636) {
+          palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+              PAL_HIGH);  // IMD
+          // ThrottleMessage throttleMessage(0x3000 | e.canFrame()[7]);
+          ThrottleMessage throttleMessage(0x3000 | (e.canFrame()[0] & 0xf));
+          canLvChSubsys.startSend(throttleMessage);
+        }
       } else if (e.type() == Event::Type::kAdcConversion) {
         // indicate received message
         if (e.adcPin() == Gpio::kA1) {

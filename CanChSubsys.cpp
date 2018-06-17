@@ -45,13 +45,14 @@ void CanChSubsys::runRxThread() {
     if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
       continue;
     }
+
     // receive any present messages from hardware
     {
       std::lock_guard<chibios_rt::Mutex> lock(m_canBusMut);
       m_canBus.processRxMessages();
     }
+
     // generate events from any received messages
-    // CANRxFrame msg;
     while (m_canBus.rxQueueSize() > 0) {
       // get CAN message
       CANRxFrame msg = m_canBus.dequeueRxMessage();
@@ -67,9 +68,7 @@ void CanChSubsys::runRxThread() {
       // write COBID to event params
       palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
       Event e = Event(Event::Type::kCanRx, msg.EID, frame);
-      // Event e = Event(Event::Type::kCanRx, msg.EID, frame[0]);
       // push event
-      // m_eventQueue.push(e);
       m_eventQueue.push(e);
     }
   }

@@ -144,16 +144,8 @@ bool AdcChSubsys::addPin(Gpio pin,
 void AdcChSubsys::runThread() {
   while (true) {
     if (m_subsysActive) {
-      // if (m_ledOn) {
-      //   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-      //   m_ledOn = false;
-      // } else {
-      //   palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-      //   m_ledOn = true;
-      // }
-
       // Make the conversion
-      // NOTE: Hard-coded to ADC Driver 1 only
+      // @note Hard-coded to ADC Driver 1 only
       adcConvert(&ADCD1, &m_adcConversionGroup, m_samples, kSampleBuffDepth);
 
       // package and post event
