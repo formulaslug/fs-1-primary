@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "hal.h"
 #include "ch.h"
+#include "Gpio.h"
 #include "Event.h"
 #include "EventQueue.h"
 
@@ -19,13 +20,6 @@
  */
 class AdcChSubsys {
  public:
-  enum class Gpio {
-    kA1 = 0,
-    kA2,
-    kA3,
-    kA6
-  };
-
   explicit AdcChSubsys(EventQueue& eq);
   ~AdcChSubsys();
 
@@ -35,9 +29,9 @@ class AdcChSubsys {
    * @param pin Gpio pin (port and pin number)
    * @param samplingFrequency sampling frequency of pin in Hz
    */
-  bool addPin(AdcChSubsys::Gpio pin, uint32_t samplingFrequency);
+  bool addPin(Gpio pin, uint32_t samplingFrequency);
 
-  bool removePin(AdcChSubsys::Gpio pin);
+  bool removePin(Gpio pin);
 
   /**
    * ADC subsystem run function
@@ -60,7 +54,7 @@ class AdcChSubsys {
   adcsample_t m_samples[kNumGpio * kSampleBuffDepth];
   // runs at the fastest sampling frequency of all analog inputs
   float m_sampleClkHz = 100; // default of 100Hz
-  uint32_t m_sampleClkMs = 1;
+  uint32_t m_sampleClkMs = 2;
   systime_t samplePeriodCycles();
 
   bool m_ledOn = false;

@@ -19,6 +19,15 @@ void EventQueue::push(Event e) {
   m_queue.PushBack(e);
 }
 
+void EventQueue::push(std::vector<Event> events) {
+  // acquire lock in current scope
+  std::lock_guard<chibios_rt::Mutex> queueGuard(m_queueMut);
+  // push items
+  for (Event e : events) {
+    m_queue.PushBack(e);
+  }
+}
+
 bool EventQueue::wait() {
   return false;
 }

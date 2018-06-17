@@ -1,6 +1,6 @@
-#include "AdcChSubsys.h"
 #include "hal.h"
 #include "ch.hpp"
+#include "AdcChSubsys.h"
 #include "Event.h"
 #include "mcuconfFs.h"
 
@@ -109,7 +109,7 @@ AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
   adcStart(&ADCD3, NULL);
 }
 
-bool AdcChSubsys::addPin(AdcChSubsys::Gpio pin,
+bool AdcChSubsys::addPin(Gpio pin,
     uint32_t samplingFrequency) {
   // fail if pin already added
   if (m_pins[static_cast<uint32_t>(pin)]) return false;
@@ -144,31 +144,30 @@ bool AdcChSubsys::addPin(AdcChSubsys::Gpio pin,
 void AdcChSubsys::runThread() {
   while (true) {
     if (m_subsysActive) {
-      if (m_ledOn) {
-        palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-        m_ledOn = false;
-      } else {
-        palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-        m_ledOn = true;
-      }
+      // if (m_ledOn) {
+      //   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+      //   m_ledOn = false;
+      // } else {
+      //   palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+      //   m_ledOn = true;
+      // }
 
       // Make the conversion
       // NOTE: Hard-coded to ADC Driver 1 only
       adcConvert(&ADCD1, &m_adcConversionGroup, m_samples, kSampleBuffDepth);
 
-      // post event
-      Event e = Event();
-      e.type = Event::kAdcConversion;
-      e.params.push_back(m_samples[1]);
-      e.params.push_back(m_samples[0]);
-      m_eventQueue.push(e);
+      // package and post event
+      std::vector<Event> events;
+      events.push_back(Event(Event::Type::kAdcConversion, Gpio::kA1, 0xfff & m_samples[0]));
+      events.push_back(Event(Event::Type::kAdcConversion, Gpio::kA2, 0xfff & m_samples[1]));
+      m_eventQueue.push(events);
     }
     // sleep to yield processing until next sample of channels
     chThdSleepMilliseconds(m_sampleClkMs);
   }
 }
 
-bool AdcChSubsys::removePin(AdcChSubsys::Gpio pin) {
+bool AdcChSubsys::removePin(Gpio pin) {
   // return failure if pin wasn't added
   if (!m_pins[static_cast<uint32_t>(pin)]) return false;
 

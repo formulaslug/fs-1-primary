@@ -1,6 +1,7 @@
 #include <mutex>
 #include "ch.h"
 #include "hal.h"
+#include "mcuconfFs.h"
 #include "CanBus.h"
 #include "Event.h"
 #include "EventQueue.h"
@@ -55,18 +56,23 @@ void CanChSubsys::runRxThread() {
       // get CAN message
       msg = m_canBus.dequeueRxMessage();
       // create event
-      Event e = Event();
-      e.type = Event::kCanRx;
+      std::array<int32_t, 8> frame;
+      // Event e = Event();
       // write data bytes to event params
+      // TODO: just switch to c-style iteration, since using an array now
       while (msg.DLC > 0) {
         // pushing data bytes to event param vector in reverse order,
         // such that popping off stack will result in correct order
-        e.params.push_back(msg.data8[msg.DLC - 1]);
+        // e.params.push_back(msg.data8[msg.DLC - 1]);
+        frame[msg.DLC - 1] = msg.data8[msg.DLC - 1];
         msg.DLC--;
       }
       // write COBID to event params
-      e.params.push_back(msg.EID);
+      // e.params.push_back(msg.EID);
+      palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+      Event e = Event(Event::Type::kCanRx, msg.EID, frame);
       // push event
+      // m_eventQueue.push(e);
       m_eventQueue.push(e);
     }
   }

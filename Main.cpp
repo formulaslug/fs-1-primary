@@ -226,8 +226,6 @@ int main() {
   CanChSubsys canHvChSubsys = CanChSubsys(canBusHv, canBusHvMut, fsmEventQueue);
 
   AdcChSubsys adcChSubsys = AdcChSubsys(fsmEventQueue);
-  adcChSubsys.addPin(AdcChSubsys::Gpio::kA1, 5); // add brake input
-  adcChSubsys.addPin(AdcChSubsys::Gpio::kA2, 5); // add throttle input
 
   /*
    * Create threads (many of which are driving subsystems)
@@ -250,6 +248,8 @@ int main() {
                     NORMALPRIO, adcThreadFunc, &adcChSubsys);
 
 
+  adcChSubsys.addPin(Gpio::kA1, 5); // add brake input
+  adcChSubsys.addPin(Gpio::kA2, 5); // add throttle input
 
 
   // TODO: Fault the system if it doesn't hear from the temp system
@@ -269,53 +269,56 @@ int main() {
 
   while (1) {
 
-    if (fsmEventQueue.size() > 0) {
-      // indicate received message
-      palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-          PAL_HIGH);  // IMD
+    while (fsmEventQueue.size() > 0) {
 
       Event e = fsmEventQueue.pop();
 
-      if (e.type == Event::kAdcConversion) {
-        palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-            PAL_HIGH);  // AMS
-        palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-            PAL_HIGH);  // BSPD
+      if (e.type() == Event::Type::kAdcConversion) {
+        // indicate received message
+        if (e.adcPin() == Gpio::kA1) {
+          palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+              PAL_HIGH);  // IMD
+          // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+          //     PAL_HIGH);  // AMS
+          // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+          //     PAL_HIGH);  // BSPD
 
-        // adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
+          // fetch new input
+          throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(e.adcValue());
 
-        // scaling to be from vref of 2.9V (as it appears Vdd is staying
-        // around on the discovery board when powered over USB)
-        // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
+          // shift outputs
+          throttleOutputs[0] = throttleOutputs[1];
 
-        // fetch new input
-        // throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & e.getParam(static_cast<uint32_t>(AdcChSubsys::Gpio::kA1)));
-        throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & e.params.front());
+          // y(n) = y(n-1) + x(n)/N - x(n-N)/N
+          uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
+          throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
 
-        // shift outputs
-        throttleOutputs[0] = throttleOutputs[1];
-
-        // y(n) = y(n-1) + x(n)/N - x(n-N)/N
-        uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
-        throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
-
-        if (throttleOutputs[1] < 130) {
-          ThrottleMessage throttleMessage(0);
-          canLvChSubsys.startSend(throttleMessage);
-        } else {
-          int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
-          if (delta >= requiredDelta || delta <= -1*requiredDelta) {
-            ThrottleMessage throttleMessage(throttleOutputs[1]);
+          // scaling to be from vref of 2.9V (at which it appears Vdd is staying
+          // on the discovery board when powered over USB)
+          if (throttleOutputs[1] < 130) {
+            ThrottleMessage throttleMessage(0 | 0x2000);
             canLvChSubsys.startSend(throttleMessage);
-            prevThrottle = (int32_t)throttleOutputs[1];
           } else {
-            ThrottleMessage throttleMessage(prevThrottle);
-            canLvChSubsys.startSend(throttleMessage);
+            int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
+            if (delta >= requiredDelta || delta <= -1*requiredDelta) {
+              ThrottleMessage throttleMessage(throttleOutputs[1] | 0x2000);
+              canLvChSubsys.startSend(throttleMessage);
+              prevThrottle = (int32_t)throttleOutputs[1];
+            } else {
+              ThrottleMessage throttleMessage(prevThrottle | 0x2000);
+              canLvChSubsys.startSend(throttleMessage);
+            }
           }
-        }
 
-        // increment current index in circular buffer
-        currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
+          // increment current index in circular buffer
+          currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
+        } else if (e.adcPin() == Gpio::kA2) {
+          // indicate received message
+          palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+              PAL_HIGH);  // IMD
+          ThrottleMessage throttleMessage(0x1000);
+          canLvChSubsys.startSend(throttleMessage);
+        }
       }
 
     }
@@ -412,6 +415,7 @@ int main() {
     }
 #endif
 
-    chThdSleepMilliseconds(10); // update dash at ~ 66Hz
+    // TODO: use condition var to signal that events are present in the queue
+    chThdSleepMilliseconds(1); // must be fast enough to deplete event queue quickly enough
   }
 }

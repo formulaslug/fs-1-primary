@@ -26,6 +26,7 @@ class EventQueue {
     // @brief thread-safe queue push
     // TODO: Rename to, correct, enqueue
     void push(Event e);
+    void push(std::vector<Event> events);
 
     // ------------------------ WIP ------------------------
     // @brief Wait (block) until the queue becomes non-empty.

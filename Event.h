@@ -3,7 +3,9 @@
 #pragma once
 
 #include <vector>
+#include <array>
 #include <stdint.h>
+#include "Gpio.h"
 
 class Event {
   public:
@@ -15,12 +17,24 @@ class Event {
       kAdcConversion
     };
 
-    Type type = kNone;
+    Event(Type t, Gpio adcPin, uint32_t adcValue);
+    Event(Type t, uint32_t canEid, std::array<int32_t, 8> canFrame);
+    Event();
+
+    Type type();
+
+    // type-specific member functions (see note in source)
+    Gpio adcPin();
+    uint32_t adcValue();
+    uint32_t canEid();
+    std::array<int32_t, 8> canFrame();
+
+
+  private:
+    Type m_type = kNone;
+
     // TODO: implement a better mechanism for storing abitrary data
     //       in event param. Should probably statically allocate event
     //       param memory, then read/write in polymorphic manner
-    std::vector<int32_t> params;
-
-    Event();
-    Event(Type t, std::vector<int32_t> p);
+    std::array<int32_t, 10> m_params;
 };
