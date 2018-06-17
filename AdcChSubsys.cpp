@@ -53,8 +53,10 @@ AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
   adcStart(&ADCD3, NULL);
 }
 
-bool AdcChSubsys::addPin(Gpio pin,
-    uint32_t samplingFrequency) {
+/**
+ * TODO: Implement sampling frequency input per-pin
+ */
+bool AdcChSubsys::addPin(Gpio pin) {
   // fail if pin already added
   if (m_pins[static_cast<uint32_t>(pin)]) return false;
 
@@ -143,32 +145,4 @@ void AdcChSubsys::start() {
 void AdcChSubsys::stop() {
   // TODO: tear down the subystem
   m_subsysActive = false;
-}
-
-uint32_t AdcChSubsys::sampleClkUs() {
-  return static_cast<uint32_t>(1000000.0 / m_sampleClkHz);
-}
-
-uint32_t AdcChSubsys::sampleClkMs() {
-  return static_cast<uint32_t>(1000.0 / m_sampleClkHz);
-}
-
-uint32_t AdcChSubsys::sampleClkS() {
-  return static_cast<uint32_t>(1.0 / m_sampleClkHz);
-}
-
-systime_t AdcChSubsys::samplePeriodCycles() {
-  return TIME_MS2I(m_sampleClkMs);
-  uint32_t us = sampleClkUs();
-  if (us < 1 || us > 999) {
-    uint32_t ms = sampleClkMs();
-    if (ms < 1 || ms > 999) {
-      uint32_t s = sampleClkS();
-      return TIME_S2I(s);
-    } else {
-      return TIME_MS2I(ms);
-    }
-  } else {
-    return TIME_US2I(us);
-  }
 }

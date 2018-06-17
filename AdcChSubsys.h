@@ -29,7 +29,7 @@ class AdcChSubsys {
    * @param pin Gpio pin (port and pin number)
    * @param samplingFrequency sampling frequency of pin in Hz
    */
-  bool addPin(Gpio pin, uint32_t samplingFrequency);
+  bool addPin(Gpio pin);
 
   bool removePin(Gpio pin);
 
@@ -42,35 +42,26 @@ class AdcChSubsys {
    */
   void runThread();
 
-  /**
-   * What SHOULD be private (need to figure out callback)
-   */
+ private:
   static constexpr uint32_t kNumGpio = 2;
   static constexpr uint32_t kMaxNumGpio = 4;
   static constexpr uint32_t kSampleBuffDepth = 8;
-  EventQueue& m_eventQueue;
-  ADCConversionGroup m_adcConversionGroup;
-  // NOTE: size in test hal is ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH
-  adcsample_t m_samples[kNumGpio * kSampleBuffDepth];
-  // runs at the fastest sampling frequency of all analog inputs
-  float m_sampleClkHz = 100; // default of 100Hz
-  uint32_t m_sampleClkMs = 100;
-  systime_t samplePeriodCycles();
 
-  bool m_ledOn = false;
-
- private:
   // states of all available analog pins
-  // bool m_pins[kNumGpio] = { false, false};
-  bool m_pins[4] = { false, false, false, false };
+  bool m_pins[kMaxNumGpio] = { false, false, false, false };
   uint8_t m_numPins = 0;
   bool m_subsysActive = false;
 
+  EventQueue& m_eventQueue;
+  ADCConversionGroup m_adcConversionGroup;
 
-  uint32_t sampleClkUs();
-  uint32_t sampleClkMs();
-  uint32_t sampleClkS();
-  // static void sampleClkCallback(void *p);
+  // @note Size in test hal is ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH
+  adcsample_t m_samples[kNumGpio * kSampleBuffDepth];
+
+  // TODO: Implement sampling frequency per-pin. Simple solution is
+  //       just a subsystem tick that meets sampling requirements of
+  //       the fastest sampled pin
+  uint32_t m_sampleClkMs = 20;
 
   void start();
   void stop();
@@ -81,14 +72,6 @@ class AdcChSubsys {
 
   // map user's Gpio pin to a pin integer
   int32_t kPinMap[kMaxNumGpio] = { 1, 2, 3, 6 };
-
-  // map user's Gpio pin to a chibios channel number
-  int32_t kChannelMap[kMaxNumGpio] = {
-    ADC_CHANNEL_IN1,
-    ADC_CHANNEL_IN2,
-    ADC_CHANNEL_IN3,
-    ADC_CHANNEL_IN6
-  };
 
   // map user's Gpio pin to chibios port pointer
   stm32_gpio_t* kPortMap[kMaxNumGpio] = {

@@ -248,8 +248,8 @@ int main() {
                     NORMALPRIO, adcThreadFunc, &adcChSubsys);
 
 
-  adcChSubsys.addPin(Gpio::kA1, 5); // add brake input
-  adcChSubsys.addPin(Gpio::kA2, 5); // add throttle input
+  adcChSubsys.addPin(Gpio::kA1); // add brake input
+  adcChSubsys.addPin(Gpio::kA2); // add throttle input
 
 
   // TODO: Fault the system if it doesn't hear from the temp system
@@ -275,17 +275,17 @@ int main() {
 
       if (e.type() == Event::Type::kCanRx) {
         std::array<uint16_t, 8> canFrame = e.canFrame();
-        uint32_t canEid = e.canEid();
-        if (canEid == 0x636) {
-          palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-              PAL_HIGH);  // IMD
-          // ThrottleMessage throttleMessage(0x3000 | e.canFrame()[7]);
-          ThrottleMessage throttleMessage(0x3000 | (e.canFrame()[0] & 0xf));
-          canLvChSubsys.startSend(throttleMessage);
-        }
+        // uint32_t canEid = e.canEid();
+        // if (canEid == 0x636) {
+        //   palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+        //       PAL_HIGH);  // IMD
+        //   // ThrottleMessage throttleMessage(0x3000 | e.canFrame()[7]);
+        //   ThrottleMessage throttleMessage(0x3000 | (e.canFrame()[0] & 0xf));
+        //   canLvChSubsys.startSend(throttleMessage);
+        // }
       } else if (e.type() == Event::Type::kAdcConversion) {
         // indicate received message
-        if (e.adcPin() == Gpio::kA1) {
+        if (e.adcPin() == Gpio::kA2) {
           palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
               PAL_HIGH);  // IMD
           // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
@@ -322,7 +322,7 @@ int main() {
 
           // increment current index in circular buffer
           currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
-        } else if (e.adcPin() == Gpio::kA2) {
+        } else if (e.adcPin() == Gpio::kA1) {
           // indicate received message
           palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
               PAL_HIGH);  // IMD
