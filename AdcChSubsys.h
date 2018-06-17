@@ -78,7 +78,6 @@ class AdcChSubsys {
   uint32_t sampleClkS();
   // static void sampleClkCallback(void *p);
 
-  void restart();
   void start();
   void stop();
 
