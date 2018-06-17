@@ -14,6 +14,7 @@
 #include "CanChSubsys.h"
 #include "AdcChSubsys.h"
 #include "DigInChSubsys.h"
+#include "AnalogFilter.h"
 
 constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
@@ -283,21 +284,13 @@ int main() {
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
-  // TODO: Add fault states to vehicle obj
-  // CANRxFrame msg;
-  // uint8_t imdFaultPinState = PAL_LOW;
-  // uint8_t bmsFaultPinState = PAL_LOW;
-  // uint8_t tempFaultPinState = PAL_LOW;
-
-  uint32_t throttleOutputs[2] = {};
-  // uint32_t throttleInputs[11] = {};
-  uint32_t throttleInputs[11] = {};
-  uint8_t currentThrottleIndex = 0;
-  int32_t prevThrottle = 0; // save for nonlinear threshold to update dash
-  const uint8_t requiredDelta = 20;
+  //
+  AnalogFilter throttleFilter = AnalogFilter();
 
   while (1) {
 
+    // always deplete the queue to help ensure that events are
+    // processed faster than they're generated
     while (fsmEventQueue.size() > 0) {
 
       Event e = fsmEventQueue.pop();
@@ -321,115 +314,35 @@ int main() {
         }
       } else if (e.type() == Event::Type::kCanRx) {
         std::array<uint16_t, 8> canFrame = e.canFrame();
-        // uint32_t canEid = e.canEid();
-        // if (canEid == 0x636) {
-        //   palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        //       PAL_HIGH);  // IMD
-        //   // ThrottleMessage throttleMessage(0x3000 | e.canFrame()[7]);
-        //   ThrottleMessage throttleMessage(0x3000 | (e.canFrame()[0] & 0xf));
-        //   canLvChSubsys.startSend(throttleMessage);
-        // }
+        uint32_t canEid = e.canEid();
+
+        // handle packet types
+        switch (canEid) {
+          default:
+            break;
+        }
       } else if (e.type() == Event::Type::kAdcConversion) {
-        // indicate received message
         if (e.adcPin() == Gpio::kA2) {
-          // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-          //     PAL_HIGH);  // IMD
-          // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-          //     PAL_HIGH);  // AMS
-          // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-          //     PAL_HIGH);  // BSPD
 
-          // fetch new input
-          throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(e.adcValue());
+          uint16_t throttle = throttleFilter.filterLms(static_cast<uint16_t>(e.adcValue()));
 
-          // shift outputs
-          throttleOutputs[0] = throttleOutputs[1];
-
-          // y(n) = y(n-1) + x(n)/N - x(n-N)/N
-          uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
-          throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
-
-          // scaling to be from vref of 2.9V (at which it appears Vdd is staying
-          // on the discovery board when powered over USB)
-          if (throttleOutputs[1] < 130) {
-            ThrottleMessage throttleMessage(0 | 0x2000);
+          // output non-zero if passed sensitivity margin
+          if (throttle < 130) {
+            ThrottleMessage throttleMessage(0);
             canLvChSubsys.startSend(throttleMessage);
           } else {
-            int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
-            if (delta >= requiredDelta || delta <= -1*requiredDelta) {
-              ThrottleMessage throttleMessage(throttleOutputs[1] | 0x2000);
-              canLvChSubsys.startSend(throttleMessage);
-              prevThrottle = (int32_t)throttleOutputs[1];
-            } else {
-              ThrottleMessage throttleMessage(prevThrottle | 0x2000);
-              canLvChSubsys.startSend(throttleMessage);
-            }
+            ThrottleMessage throttleMessage(throttle);
+            canLvChSubsys.startSend(throttleMessage);
           }
-
-          // increment current index in circular buffer
-          currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
         } else if (e.adcPin() == Gpio::kA1) {
           // indicate received message
-          // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-          //     PAL_HIGH);  // IMD
           ThrottleMessage throttleMessage(0x1000);
           canLvChSubsys.startSend(throttleMessage);
         }
       }
-
     }
 
-    // read all digital inputs
-    // auto neutralButton = palReadPad(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN);
-    // auto driveButton = palReadPad(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN);
-    // auto driveModeButton = palReadPad(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN);
-    // auto bspdFault = palReadPad(BSPD_FAULT_PORT, BSPD_FAULT_PIN);
-
-    // adcConvert(&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
-    //
-    // // scaling to be from vref of 2.9V (as it appears Vdd is staying
-    // // around on the discovery board when powered over USB)
-    // // uint32_t throttleValue = static_cast<uint16_t>(0xfff & samples1[0]);
-    //
-    // // fetch new input
-    // throttleInputs[currentThrottleIndex] = static_cast<uint16_t>(0xfff & samples1[1]);
-    //
-    // // shift outputs
-    // throttleOutputs[0] = throttleOutputs[1];
-    //
-    // // y(n) = y(n-1) + x(n)/N - x(n-N)/N
-    // uint8_t nextThrottleIndex = (currentThrottleIndex + 1) % 11;
-    // throttleOutputs[1] = throttleOutputs[0] + throttleInputs[currentThrottleIndex]/10 - throttleInputs[nextThrottleIndex]/10;
-    //
-    // if (throttleOutputs[1] < 130) {
-    //   ThrottleMessage throttleMessage(0);
-    //   canLvChSubsys.startSend(throttleMessage);
-    // } else {
-    //   int32_t delta = (int32_t)throttleOutputs[1] - prevThrottle;
-    //   if (delta >= requiredDelta || delta <= -1*requiredDelta) {
-    //     ThrottleMessage throttleMessage(throttleOutputs[1]);
-    //     canLvChSubsys.startSend(throttleMessage);
-    //     prevThrottle = (int32_t)throttleOutputs[1];
-    //   } else {
-    //     ThrottleMessage throttleMessage(prevThrottle);
-    //     canLvChSubsys.startSend(throttleMessage);
-    //   }
-    // }
-    //
-    // // increment current index in circular buffer
-    // currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
-
 #if 0
-    // reflect button states on LEDs
-    palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-        neutralButton ? PAL_LOW : PAL_HIGH);  // AMS
-    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-        driveButton ? PAL_LOW : PAL_HIGH);  // IMD
-    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        driveModeButton ? PAL_LOW : PAL_HIGH);  // BSPD
-    palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-        bspdFault ? PAL_HIGH : PAL_LOW);  // RTDS signal
-
     // handle new packet if available
     if (canBusHV.rxQueueSize() > 0 ) {
       msg = canBusHV.dequeueRxMessage();

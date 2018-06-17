@@ -61,7 +61,7 @@ class AdcChSubsys {
   // TODO: Implement sampling frequency per-pin. Simple solution is
   //       just a subsystem tick that meets sampling requirements of
   //       the fastest sampled pin
-  uint32_t m_sampleClkMs = 20;
+  uint32_t m_sampleClkMs = 15;
 
   void start();
   void stop();
