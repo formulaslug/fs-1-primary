@@ -18,14 +18,12 @@ bool DigInChSubsys::addPin(DigitalInput pin) {
   stop();
 
   // set the pin mode
-  // TODO: LEFT OFF: changing names of internal getters to not reuse
-  //       variable names anywhere (linker error)
-  // palSetPadMode(getPort(pin), getPinNum(pin), PAL_MODE_INPUT_PULLUP);
+  palSetPadMode(getPort(pin), getPinNum(pin), PAL_MODE_INPUT_PULLUP);
 
   // add the pin internally
   m_pins[static_cast<uint32_t>(pin)] = true;
   // init current state
-  // m_pinStates[static_cast<uint32_t>(pin)] = getState(pin);
+  m_pinStates[static_cast<uint32_t>(pin)] = getState(pin);
   m_numPins++;
 
   // start the subsystem again with new configuration
@@ -39,15 +37,19 @@ void DigInChSubsys::runThread() {
   while (true) {
     if (m_subsysActive) {
       std::vector<Event> events;
-      for (uint32_t i = 0; i < m_numPins; i++) {
-        // // check for transition in pin state
-        // bool currentState = getState(static_cast<DigitalInput>(i));
 
-        // // queue event if pin changed states
-        // if (currentState != m_pinStates.at(i)) {
-        //   events.push_back(Event(Event::Type::kDigInTransition,
-        //         static_cast<DigitalInput>(i), currentState));
-        // }
+      for (uint32_t i = 0; i < m_numPins; i++) {
+        // check for transition in pin state
+        bool currentState = getState(static_cast<DigitalInput>(i));
+
+        // if pin changed states
+        if (currentState != getSavedState(static_cast<DigitalInput>(i))) {
+          // save change
+          m_pinStates[i] = currentState;
+          // queue event 
+          events.push_back(Event(Event::Type::kDigInTransition,
+                static_cast<DigitalInput>(i), currentState));
+        }
       }
 
       // post events if present
@@ -79,9 +81,14 @@ bool DigInChSubsys::removePin(DigitalInput pin) {
   return false;
 }
 
-// bool DigInChSubsys::getState(DigitalInput p) {
-//   return palReadPad(getPort(p), getPinNum(p)) != 0;
-// }
+/**
+ * @note Public interface only permits access to subsystem's
+ *       internally saved pin state, rather than pin value, in order
+ *       to ensure consistent in user's implementation
+ */
+bool DigInChSubsys::getSavedState(DigitalInput p) {
+  return m_pinStates[static_cast<uint32_t>(p)];
+}
 
 // TODO: implement full subsystem, then implement pin adding
 void DigInChSubsys::start() {
@@ -106,10 +113,14 @@ bool DigInChSubsys::registered(DigitalInput p) {
   }
 }
 
-// uint32_t DigInChSubsys::getPinNum(DigitalInput p) {
-//   return kPinMap[static_cast<uint32_t>(p)];
-// }
-//
-// stm32_gpio_t* DigInChSubsys::getPort(DigitalInput p) {
-//   return kPortMap[static_cast<uint32_t>(p)];
-// }
+uint32_t DigInChSubsys::getPinNum(DigitalInput p) {
+  return kPinMap[static_cast<uint32_t>(p)];
+}
+
+stm32_gpio_t* DigInChSubsys::getPort(DigitalInput p) {
+  return kPortMap[static_cast<uint32_t>(p)];
+}
+
+bool DigInChSubsys::getState(DigitalInput p) {
+  return palReadPad(getPort(p), getPinNum(p)) != 0;
+}

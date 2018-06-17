@@ -13,9 +13,22 @@
 #include "EventQueue.h"
 #include "CanChSubsys.h"
 #include "AdcChSubsys.h"
+#include "DigInChSubsys.h"
 
 constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
+
+static virtual_timer_t vtLedBspd, vtLedImd;
+
+static void ledBspdOff(void *p) {
+  (void)p;
+  palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
+}
+
+static void ledImdOff(void *p) {
+  (void)p;
+  palClearPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);  // IMD
+}
 
 // #define ADC_GRP1_NUM_CHANNELS   2
 // #define ADC_GRP1_BUF_DEPTH      8
@@ -130,6 +143,15 @@ static THD_FUNCTION(adcThreadFunc, adcChSubsys) {
   static_cast<AdcChSubsys*>(adcChSubsys)->runThread();
 }
 
+/**
+ * Digital Input subsystem thread
+ */
+static THD_WORKING_AREA(digInThreadFuncWa, 128);
+static THD_FUNCTION(digInThreadFunc, digInChSubsys) {
+  chRegSetThreadName("CAN RX HV");
+  static_cast<DigInChSubsys*>(digInChSubsys)->runThread();
+}
+
 int main() {
   /*
    * System initializations.
@@ -148,8 +170,9 @@ int main() {
   // palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
   // palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
   // Digital inputs
-  palSetPadMode(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN,
-      PAL_MODE_INPUT_PULLUP);  // IMD
+  // commented out to confirm that subsystem is working
+  // palSetPadMode(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN,
+  //     PAL_MODE_INPUT_PULLUP);  // IMD
   palSetPadMode(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN,
       PAL_MODE_INPUT_PULLUP);  // AMS
   palSetPadMode(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN,
@@ -227,6 +250,8 @@ int main() {
 
   AdcChSubsys adcChSubsys = AdcChSubsys(fsmEventQueue);
 
+  DigInChSubsys digInChSubsys = DigInChSubsys(fsmEventQueue);
+
   /*
    * Create threads (many of which are driving subsystems)
    */
@@ -246,10 +271,14 @@ int main() {
   //                   throttleThreadFunc, &canHvChSubsys);
   chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa),
                     NORMALPRIO, adcThreadFunc, &adcChSubsys);
+  chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa),
+                    NORMALPRIO, digInThreadFunc, &digInChSubsys);
 
 
   adcChSubsys.addPin(Gpio::kA1); // add brake input
   adcChSubsys.addPin(Gpio::kA2); // add throttle input
+
+  digInChSubsys.addPin(DigitalInput::kTriStateUp);
 
 
   // TODO: Fault the system if it doesn't hear from the temp system
@@ -273,7 +302,24 @@ int main() {
 
       Event e = fsmEventQueue.pop();
 
-      if (e.type() == Event::Type::kCanRx) {
+      if (e.type() == Event::Type::kDigInTransition) {
+        switch (e.digInState()) {
+          case true:
+            // rising edge
+            // flash BSPD LED quickly
+            palSetPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
+            chVTReset(&vtLedBspd);
+            chVTSet(&vtLedBspd, TIME_MS2I(100), ledBspdOff, NULL);
+            break;
+          case false:
+            // falling edge
+            // flash BSPD LED slowly
+            palSetPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);  // IMD
+            chVTReset(&vtLedImd);
+            chVTSet(&vtLedImd, TIME_MS2I(100), ledImdOff, NULL);
+            break;
+        }
+      } else if (e.type() == Event::Type::kCanRx) {
         std::array<uint16_t, 8> canFrame = e.canFrame();
         // uint32_t canEid = e.canEid();
         // if (canEid == 0x636) {
@@ -286,8 +332,8 @@ int main() {
       } else if (e.type() == Event::Type::kAdcConversion) {
         // indicate received message
         if (e.adcPin() == Gpio::kA2) {
-          palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-              PAL_HIGH);  // IMD
+          // palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+          //     PAL_HIGH);  // IMD
           // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
           //     PAL_HIGH);  // AMS
           // palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
@@ -324,8 +370,8 @@ int main() {
           currentThrottleIndex  = (currentThrottleIndex + 1) % 11;
         } else if (e.adcPin() == Gpio::kA1) {
           // indicate received message
-          palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-              PAL_HIGH);  // IMD
+          // palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+          //     PAL_HIGH);  // IMD
           ThrottleMessage throttleMessage(0x1000);
           canLvChSubsys.startSend(throttleMessage);
         }

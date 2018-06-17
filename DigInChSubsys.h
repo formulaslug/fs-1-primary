@@ -11,14 +11,11 @@
 #include "EventQueue.h"
 #include "mcuconfFs.h"
 
-
 /**
  *
- * TODO: LEFT OFF: Linker complaining about overlapping names internal
- *       to this class and elsewhere in included libs. Need to
- *       uncomment what's currently commented out to find the offender(s)
+ * TODO: Rewrite subsystem using the EXT external interrupt driver
+ *
  */
-
 
 /**
  *
@@ -41,7 +38,7 @@ class DigInChSubsys {
 
   bool removePin(DigitalInput pin);
 
-  // bool getState(DigitalInput p);
+  bool getSavedState(DigitalInput p);
 
   /**
    * Digital input subsystem run function
@@ -57,7 +54,7 @@ class DigInChSubsys {
   uint16_t m_numPins = 0;
 
   // @note true if pin is registered, false otherwise
-  std::array<bool, kMaxNumPins> m_pins;
+  std::array<bool, kMaxNumPins> m_pins = {};
 
   // @note true is HIGH, false is LOW
   std::array<bool, kMaxNumPins> m_pinStates = {};
@@ -76,6 +73,8 @@ class DigInChSubsys {
 
   bool registered(DigitalInput p);
 
+  bool getState(DigitalInput p);
+
   /**
    * @note Maps for constant-time lookup of attrs of the analog input
    */
@@ -87,7 +86,7 @@ class DigInChSubsys {
     TRI_STATE_SWITCH_UP_PORT
   };
 
-  // uint32_t getPinNum(DigitalInput p);
-  //
-  // stm32_gpio_t* getPort(DigitalInput p);
+  uint32_t getPinNum(DigitalInput p);
+
+  stm32_gpio_t* getPort(DigitalInput p);
 };

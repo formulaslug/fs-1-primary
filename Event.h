@@ -30,7 +30,8 @@ class Event {
     uint32_t adcValue();
     uint32_t canEid();
     std::array<uint16_t, 8> canFrame();
-
+    DigitalInput digInPin();
+    bool digInState();
 
   private:
     Type m_type = kNone;

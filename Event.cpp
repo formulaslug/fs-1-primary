@@ -50,4 +50,7 @@ std::array<uint16_t, 8> Event::canFrame() {
   return frame;
 }
 
-// TODO: implement digital pin getters
+// Digital Input event member functions
+DigitalInput Event::digInPin() { return static_cast<DigitalInput>(m_params[0]); }
+
+bool Event::digInState() { return static_cast<bool>(m_params[1]); }
