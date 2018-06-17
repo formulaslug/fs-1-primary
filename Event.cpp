@@ -1,4 +1,5 @@
 #include "Event.h"
+#include "Gpio.h"
 #include <array>
 
 Event::Event() {}
@@ -14,6 +15,10 @@ Event::Event(Type t, uint32_t canEid, std::array<uint16_t, 8> canFrame) : m_type
   // set data frame (max 8 bytes)
   std::copy(canFrame.begin(), canFrame.begin() + 8,
       m_params.begin() + 1);
+}
+Event::Event(Type t, DigitalInput pin, bool currentState) : m_type(t) {
+  m_params[0] = static_cast<uint16_t>(pin);
+  m_params[1] = static_cast<uint16_t>(currentState);
 }
 
 Event::Type Event::type() {
@@ -44,3 +49,5 @@ std::array<uint16_t, 8> Event::canFrame() {
 
   return frame;
 }
+
+// TODO: implement digital pin getters

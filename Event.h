@@ -14,12 +14,13 @@ class Event {
       kNone,
       kCanRx,
       kTimerTimeout,
-      kAdcConversion
+      kAdcConversion,
+      kDigInTransition
     };
 
     Event(Type t, Gpio adcPin, uint32_t adcValue);
     Event(Type t, uint32_t canEid, std::array<uint16_t, 8> canFrame);
-    // Event(Type t, uint32_t canEid, uint32_t canFrame);
+    Event(Type t, DigitalInput pin, bool currentState);
     Event();
 
     Type type();
