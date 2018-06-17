@@ -75,9 +75,6 @@ class AdcChSubsys {
   void start();
   void stop();
 
-  // chibios callbacks
-  // ...
-
   /**
    * @note Maps for constant-time lookup of attrs of the analog input
    */

@@ -4,62 +4,6 @@
 #include "Event.h"
 #include "mcuconfFs.h"
 
-// NOTE: Needed to use threads instead of virtual timers to meet
-//       ChibiOS API reqs...
-// static adcsample_t g_samples[2 * 8];
-// static const ADCConversionGroup g_adcConversionGroup = {
-//   FALSE,
-//   2,
-//   NULL,
-//   NULL,
-//   0,                        #<{(| CR1 |)}>#
-//   ADC_CR2_SWSTART,          #<{(| CR2 |)}>#
-//   // SMPR1: Samples times for channels 10-17
-//   0,
-//   // SMPR2: Samples times for channels 0-9
-//   // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-//   // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-//   // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-//   ADC_SMPR2_SMP_AN1(ADC_SAMPLE_3) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_3),
-//   0,                        #<{(| SQR1 |)}>#
-//   0,                        #<{(| SQR2 |)}>#
-//   // SQR1: Conversion group sequence 1-6
-//   // @brief specify which channels, in which order, are sampled per
-//   //        conversion sequence
-//   // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-//   //       ADC_CHANNEL_IN[Y]
-//   ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-//   // // use a circular buffer
-//   // false,
-//   // // num channels
-//   // 1,
-//   // // end conversion callback
-//   // NULL,
-//   // // error callback
-//   // NULL,
-//   // // CR1 register config
-//   // 0,
-//   // // CR2 register config
-//   // ADC_CR2_SWSTART,
-//   // // SMPR1: Samples times for channels 10-17
-//   // 0,
-//   // // SMPR2: Samples times for channels 0-9
-//   // // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-//   // // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-//   // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480),// | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-//   // // SQR1 register config
-//   // 0,
-//   // // SQR2
-//   // 0,
-//   // // SQR1: Conversion group sequence 1-6
-//   // // @brief specify which channels, in which order, are sampled per
-//   // //        conversion sequence
-//   // // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-//   // //       ADC_CHANNEL_IN[Y]
-//   // ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1)// | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
-// };
-
-
 // TODO: Test system with all four ADC inputs
 // BRAKE_VALUE_PIN -> ADC123_IN1 (POT 2)
 //
