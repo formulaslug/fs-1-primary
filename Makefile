@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16
+  USE_OPT = -O2 -fomit-frame-pointer -falign-functions=16
 endif
 
 # C specific options here (added to USE_OPT).
@@ -116,7 +116,11 @@ CSRC = $(ALLCSRC)
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 CPPSRC = $(ALLCPPSRC) \
+         $(wildcard WPILib/*.cpp) \
+         $(wildcard wpi/*.cpp) \
          $(wildcard *.cpp) \
+         $(wildcard WPILib/*.hpp) \
+         $(wildcard wpi/*.hpp) \
          $(wildcard *.hpp)
 
 # C sources to be compiled in ARM mode regardless of the global setting.

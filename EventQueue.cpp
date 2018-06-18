@@ -14,14 +14,14 @@ Event EventQueue::pop() {
   // acquire lock guard in current scope
   std::lock_guard<chibios_rt::Mutex> lock(m_queueMut);
   // pop item from queue and return
-  return m_queue.PopFront();
+  return m_queue.pop_front();
 }
 
 void EventQueue::push(Event e) {
   // acquire lock in current scope
   std::lock_guard<chibios_rt::Mutex> queueGuard(m_queueMut);
   // push item
-  m_queue.PushBack(e);
+  m_queue.push_back(e);
 }
 
 void EventQueue::push(std::vector<Event> events) {
@@ -29,10 +29,10 @@ void EventQueue::push(std::vector<Event> events) {
   std::lock_guard<chibios_rt::Mutex> queueGuard(m_queueMut);
   // push items
   for (Event e : events) {
-    m_queue.PushBack(e);
+    m_queue.push_back(e);
   }
 }
 
 bool EventQueue::wait() { return false; }
 
-size_t EventQueue::size() { return m_queue.Size(); }
+size_t EventQueue::size() { return m_queue.size(); }

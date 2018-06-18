@@ -4,7 +4,6 @@
 #include <mutex>
 
 #include "AdcChSubsys.h"
-#include "AnalogFilter.h"
 #include "CanBus.h"
 #include "CanChSubsys.h"
 #include "CanOpenPdo.h"
@@ -12,6 +11,7 @@
 #include "Event.h"
 #include "EventQueue.h"
 #include "Vehicle.h"
+#include "WPILib/LinearFilter.h"
 #include "ch.hpp"
 #include "hal.h"
 #include "mcuconfFs.h"
@@ -260,7 +260,10 @@ int main() {
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
   //
-  AnalogFilter throttleFilter = AnalogFilter();
+  // FIXME: Have LinearFilter poll for value in source function instead of using
+  // this temp storage.
+  double adcStorage = 0.0;
+  auto throttleFilter = frc::LinearFilter::LMS([&] { return adcStorage; }, 10);
 
   while (1) {
     // always deplete the queue to help ensure that events are
@@ -300,8 +303,8 @@ int main() {
         }
       } else if (e.type() == Event::Type::kAdcConversion) {
         if (e.adcPin() == Gpio::kA2) {
-          uint16_t throttle =
-              throttleFilter.filterLms(static_cast<uint16_t>(e.adcValue()));
+          adcStorage = static_cast<uint16_t>(e.adcValue());
+          uint16_t throttle = throttleFilter.Get();
 
           // output non-zero if passed sensitivity margin
           if (throttle < 130) {
