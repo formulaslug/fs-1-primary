@@ -1,10 +1,13 @@
-#include "hal.h"
-#include "ch.hpp"
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
 #include "DigInChSubsys.h"
+
 #include "Event.h"
+#include "ch.hpp"
+#include "hal.h"
 #include "mcuconfFs.h"
 
-DigInChSubsys::DigInChSubsys(EventQueue& eq) : m_eventQueue(eq) { }
+DigInChSubsys::DigInChSubsys(EventQueue& eq) : m_eventQueue(eq) {}
 
 /**
  * TODO: Implement sampling frequency input per-pin
@@ -46,9 +49,9 @@ void DigInChSubsys::runThread() {
         if (currentState != getSavedState(static_cast<DigitalInput>(i))) {
           // save change
           m_pinStates[i] = currentState;
-          // queue event 
+          // queue event
           events.push_back(Event(Event::Type::kDigInTransition,
-                static_cast<DigitalInput>(i), currentState));
+                                 static_cast<DigitalInput>(i), currentState));
         }
       }
 
@@ -91,9 +94,7 @@ bool DigInChSubsys::getSavedState(DigitalInput p) {
 }
 
 // TODO: implement full subsystem, then implement pin adding
-void DigInChSubsys::start() {
-  m_subsysActive = true;
-}
+void DigInChSubsys::start() { m_subsysActive = true; }
 
 /**
  * @note Subsystem should be stopped before any configurations are

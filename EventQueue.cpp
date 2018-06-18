@@ -1,7 +1,12 @@
-#include <mutex>
-#include <stdint.h>
-#include "hal.h"
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
 #include "EventQueue.h"
+
+#include <stdint.h>
+
+#include <mutex>
+
+#include "hal.h"
 
 EventQueue::EventQueue() {}
 
@@ -28,10 +33,6 @@ void EventQueue::push(std::vector<Event> events) {
   }
 }
 
-bool EventQueue::wait() {
-  return false;
-}
+bool EventQueue::wait() { return false; }
 
-size_t EventQueue::size() {
-  return m_queue.Size();
-}
+size_t EventQueue::size() { return m_queue.Size(); }

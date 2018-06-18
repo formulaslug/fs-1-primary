@@ -1,8 +1,8 @@
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
 #include "AnalogFilter.h"
 
-AnalogFilter::AnalogFilter() {
-}
-
+AnalogFilter::AnalogFilter() {}
 
 /**
  * TODO: Allow analog filter to pass a lambda as the final constructor
@@ -23,7 +23,8 @@ uint16_t AnalogFilter::filterLms(uint16_t sample) {
   //       end
   // y(n) = y(n-1) + x(n)/N - x(n-N)/N
   uint8_t nextIndex = (m_currentIndex + 1) % 11;
-  m_outputs[1] = m_outputs[0] + m_inputs[m_currentIndex]/10 - m_inputs[nextIndex]/10;
+  m_outputs[1] =
+      m_outputs[0] + m_inputs[m_currentIndex] / 10 - m_inputs[nextIndex] / 10;
 
   // set new index
   m_currentIndex = nextIndex;

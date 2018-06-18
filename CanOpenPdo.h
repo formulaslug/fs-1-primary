@@ -38,7 +38,7 @@
 
 // System IDs
 constexpr uint32_t kSysIdMask = 0x00f;
-constexpr uint32_t kSysIdFs = 0x004; // 0b1000
+constexpr uint32_t kSysIdFs = 0x004;  // 0b1000
 // Node IDs
 constexpr uint32_t kNodeIdMask = 0x0f0;
 constexpr uint32_t kNodeIdPrimary = 0x000;
@@ -54,8 +54,9 @@ constexpr uint32_t kFuncIdBreakValue = 0x008;
 constexpr uint32_t kFuncIdSteeringValue = 0x009;
 // Full COB-IDs
 constexpr uint32_t kCobIdTPDO5 = 0x242;
-// constexpr uint32_t kCobIdTPDO5 = 0x241;  // including throttle voltage payload
-// constexpr uint32_t kCobIdTPDO5 = 0x80000000; // new COB-ID for testing
+// constexpr uint32_t kCobIdTPDO5 = 0x241;  // including throttle voltage
+// payload constexpr uint32_t kCobIdTPDO5 = 0x80000000; // new COB-ID for
+// testing
 constexpr uint32_t kCobIdNode3Heartbeat = 0x611;
 constexpr uint32_t kCobIdNode4Heartbeat = 0x621;
 constexpr uint32_t kCobIdCellTempHeartbeat = 0x631;
@@ -67,7 +68,7 @@ constexpr uint32_t kPayloadHeartbeat = 0x1;
 
 struct HeartbeatMessage : public CANTxFrame {
   // explicit HeartbeatMessage(uint32_t id);
-  HeartbeatMessage(uint16_t data);
+  explicit HeartbeatMessage(uint16_t data);
 };
 
 struct ThrottleMessage : public CANTxFrame {
@@ -76,7 +77,7 @@ struct ThrottleMessage : public CANTxFrame {
    *                        Master
    * @param forwardSwitch If true, enables forward drive
    */
-  ThrottleMessage(uint16_t throttleVoltage);
+  explicit ThrottleMessage(uint16_t throttleVoltage);
 };
 
 /**

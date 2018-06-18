@@ -2,13 +2,15 @@
 
 #pragma once
 
-#include <vector>
 #include <stdint.h>
-#include "hal.h"
-#include "ch.h"
-#include "Gpio.h"
+
+#include <vector>
+
 #include "Event.h"
 #include "EventQueue.h"
+#include "Gpio.h"
+#include "ch.h"
+#include "hal.h"
 
 /**
  *
@@ -48,7 +50,7 @@ class AdcChSubsys {
   static constexpr uint32_t kSampleBuffDepth = 8;
 
   // states of all available analog pins
-  bool m_pins[kMaxNumGpio] = { false, false, false, false };
+  bool m_pins[kMaxNumGpio] = {false, false, false, false};
   uint8_t m_numPins = 0;
   bool m_subsysActive = false;
 
@@ -71,23 +73,15 @@ class AdcChSubsys {
    */
 
   // map user's Gpio pin to a pin integer
-  int32_t kPinMap[kMaxNumGpio] = { 1, 2, 3, 6 };
+  int32_t kPinMap[kMaxNumGpio] = {1, 2, 3, 6};
 
   // map user's Gpio pin to chibios port pointer
-  stm32_gpio_t* kPortMap[kMaxNumGpio] = {
-    GPIOA,
-    GPIOA,
-    GPIOA,
-    GPIOA
-  };
+  stm32_gpio_t* kPortMap[kMaxNumGpio] = {GPIOA, GPIOA, GPIOA, GPIOA};
 
   // map user's Gpio pin to a sample time macro from chibios
   uint32_t kSampleChargeTimeMap[kMaxNumGpio] = {
-    ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480),
-    ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-    ADC_SMPR2_SMP_AN3(ADC_SAMPLE_480),
-    ADC_SMPR2_SMP_AN4(ADC_SAMPLE_480)
-  };
+      ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480), ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+      ADC_SMPR2_SMP_AN3(ADC_SAMPLE_480), ADC_SMPR2_SMP_AN4(ADC_SAMPLE_480)};
 
   /**
    *
@@ -98,9 +92,6 @@ class AdcChSubsys {
    *       channels they can be read from
    */
   uint32_t kConversionSequenceMap[kMaxNumGpio] = {
-    ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1),
-    ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2),
-    ADC_SQR3_SQ3_N(ADC_CHANNEL_IN3),
-    ADC_SQR3_SQ4_N(ADC_CHANNEL_IN6)
-  };
+      ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1), ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2),
+      ADC_SQR3_SQ3_N(ADC_CHANNEL_IN3), ADC_SQR3_SQ4_N(ADC_CHANNEL_IN6)};
 };

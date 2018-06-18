@@ -18,7 +18,7 @@ enum class CanBusBaudRate : uint8_t {
 
 class CanBus {
  public:
-  CanBus(uint32_t id, CANDriver *canp, CanBusBaudRate baud, bool loopback);
+  CanBus(uint32_t id, CANDriver* canp, CanBusBaudRate baud, bool loopback);
   virtual ~CanBus();
 
   void setFilters(std::initializer_list<uint32_t> filters);
@@ -44,7 +44,7 @@ class CanBus {
 
   // NOTE: Made this public, until this abstraction can be merged
   //       with the CanChSubsys one
-  CANDriver *m_canp;
+  CANDriver* m_canp;
 
  private:
   // circular buffers to hold CanBus_message_t instances

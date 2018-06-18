@@ -3,30 +3,31 @@
 #include <array>
 #include <mutex>
 
+#include "AdcChSubsys.h"
+#include "AnalogFilter.h"
 #include "CanBus.h"
+#include "CanChSubsys.h"
 #include "CanOpenPdo.h"
+#include "DigInChSubsys.h"
+#include "Event.h"
+#include "EventQueue.h"
 #include "Vehicle.h"
 #include "ch.hpp"
 #include "hal.h"
 #include "mcuconfFs.h"
-#include "Event.h"
-#include "EventQueue.h"
-#include "CanChSubsys.h"
-#include "AdcChSubsys.h"
-#include "DigInChSubsys.h"
-#include "AnalogFilter.h"
 
-constexpr uint32_t kMaxPot = 4096; // out of 4096 -- 512 is 1/8 max throttle value
+constexpr uint32_t kMaxPot =
+    4096;  // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
 static virtual_timer_t vtLedBspd, vtLedStartup;
 
-static void ledBspdOff(void *p) {
+static void ledBspdOff(void* p) {
   (void)p;
   palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
 }
 
-static void ledStartupOff(void *p) {
+static void ledStartupOff(void* p) {
   (void)p;
   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
 }
@@ -143,33 +144,33 @@ int main() {
 
   // Pin initialization
   // Analog inputs
-  // palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
-  // palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN, PAL_MODE_INPUT_ANALOG);
-  // palSetPadMode(RIGHT_THROTTLE_PORT, RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
-  // palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
-  // Digital inputs
-  // commented out to confirm that subsystem is working
-  // palSetPadMode(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN,
+  // palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN,
+  // PAL_MODE_INPUT_ANALOG); palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN,
+  // PAL_MODE_INPUT_ANALOG); palSetPadMode(RIGHT_THROTTLE_PORT,
+  // RIGHT_THROTTLE_PIN, PAL_MODE_INPUT_ANALOG);
+  // palSetPadMode(LEFT_THROTTLE_PORT, LEFT_THROTTLE_PIN,
+  // PAL_MODE_INPUT_ANALOG); Digital inputs commented out to confirm that
+  // subsystem is working palSetPadMode(NEUTRAL_BUTTON_PORT, NEUTRAL_BUTTON_PIN,
   //     PAL_MODE_INPUT_PULLUP);  // IMD
   palSetPadMode(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN,
-      PAL_MODE_INPUT_PULLUP);  // AMS
+                PAL_MODE_INPUT_PULLUP);  // AMS
   palSetPadMode(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN,
-      PAL_MODE_INPUT_PULLUP);  // BSPD
+                PAL_MODE_INPUT_PULLUP);  // BSPD
   palSetPadMode(BSPD_FAULT_PORT, BSPD_FAULT_PIN,
-      PAL_MODE_INPUT_PULLUP);  // RTDS signal
+                PAL_MODE_INPUT_PULLUP);  // RTDS signal
   // Digital outputs
   palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // IMD
+                PAL_MODE_OUTPUT_PUSHPULL);  // IMD
   palSetPadMode(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // AMS
+                PAL_MODE_OUTPUT_PUSHPULL);  // AMS
   palSetPadMode(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // BSPD
+                PAL_MODE_OUTPUT_PUSHPULL);  // BSPD
   palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // RTDS signal
+                PAL_MODE_OUTPUT_PUSHPULL);  // RTDS signal
   palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
+                PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
   palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN,
-      PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
+                PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
 
   // Init LED states to LOW (including faults)
   palClearPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);
@@ -178,7 +179,6 @@ int main() {
   palClearPad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN);
   palClearPad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-
 
   // TODO: implement vehicle singleton
   Vehicle vehicle;
@@ -192,29 +192,28 @@ int main() {
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 2; i++) {
     palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-        PAL_HIGH);  // IMD
+                PAL_HIGH);  // IMD
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-        PAL_HIGH);  // AMS
+                PAL_HIGH);  // AMS
     palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        PAL_HIGH);  // BSPD
+                PAL_HIGH);  // BSPD
     palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-        PAL_HIGH);  // RTDS
+                PAL_HIGH);  // RTDS
     palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
-        PAL_HIGH);  // Brake Light
+                PAL_HIGH);  // Brake Light
     chThdSleepMilliseconds(200);
     palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-        PAL_LOW);  // IMD
+                PAL_LOW);  // IMD
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-        PAL_LOW);  // AMS
+                PAL_LOW);  // AMS
     palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-        PAL_LOW);  // Temp
+                PAL_LOW);  // Temp
     palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-        PAL_LOW);  // RTDS
+                PAL_LOW);  // RTDS
     palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
-        PAL_LOW);  // Brake Light
+                PAL_LOW);  // Brake Light
     chThdSleepMilliseconds(200);
   }
-
 
   /**
    * Create subsystems
@@ -235,29 +234,28 @@ int main() {
    */
   chThdCreateStatic(canRxLvThreadFuncWa, sizeof(canRxLvThreadFuncWa),
                     NORMALPRIO, canRxLvThreadFunc, &canLvChSubsys);
-  chThdCreateStatic(canTxLvThreadFuncWa, sizeof(canTxLvThreadFuncWa), NORMALPRIO + 1,
-                    canTxLvThreadFunc, &canLvChSubsys);
-  chThdCreateStatic(heartbeatLvThreadFuncWa, sizeof(heartbeatLvThreadFuncWa), NORMALPRIO,
-                    heartbeatLvThreadFunc, &canLvChSubsys);
-  chThdCreateStatic(heartbeatHvThreadFuncWa, sizeof(heartbeatHvThreadFuncWa), NORMALPRIO,
-                    heartbeatHvThreadFunc, &canHvChSubsys);
-  chThdCreateStatic(canTxHvThreadFuncWa, sizeof(canTxHvThreadFuncWa), NORMALPRIO + 1,
-                    canTxHvThreadFunc, &canHvChSubsys);
+  chThdCreateStatic(canTxLvThreadFuncWa, sizeof(canTxLvThreadFuncWa),
+                    NORMALPRIO + 1, canTxLvThreadFunc, &canLvChSubsys);
+  chThdCreateStatic(heartbeatLvThreadFuncWa, sizeof(heartbeatLvThreadFuncWa),
+                    NORMALPRIO, heartbeatLvThreadFunc, &canLvChSubsys);
+  chThdCreateStatic(heartbeatHvThreadFuncWa, sizeof(heartbeatHvThreadFuncWa),
+                    NORMALPRIO, heartbeatHvThreadFunc, &canHvChSubsys);
+  chThdCreateStatic(canTxHvThreadFuncWa, sizeof(canTxHvThreadFuncWa),
+                    NORMALPRIO + 1, canTxHvThreadFunc, &canHvChSubsys);
   chThdCreateStatic(canRxHvThreadFuncWa, sizeof(canRxHvThreadFuncWa),
                     NORMALPRIO, canRxHvThreadFunc, &canHvChSubsys);
-  // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa), NORMALPRIO + 1,
+  // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa),
+  // NORMALPRIO + 1,
   //                   throttleThreadFunc, &canHvChSubsys);
-  chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa),
-                    NORMALPRIO, adcThreadFunc, &adcChSubsys);
-  chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa),
-                    NORMALPRIO, digInThreadFunc, &digInChSubsys);
+  chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa), NORMALPRIO,
+                    adcThreadFunc, &adcChSubsys);
+  chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa), NORMALPRIO,
+                    digInThreadFunc, &digInChSubsys);
 
-
-  adcChSubsys.addPin(Gpio::kA1); // add brake input
-  adcChSubsys.addPin(Gpio::kA2); // add throttle input
+  adcChSubsys.addPin(Gpio::kA1);  // add brake input
+  adcChSubsys.addPin(Gpio::kA2);  // add throttle input
 
   digInChSubsys.addPin(DigitalInput::kTriStateUp);
-
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
@@ -265,11 +263,9 @@ int main() {
   AnalogFilter throttleFilter = AnalogFilter();
 
   while (1) {
-
     // always deplete the queue to help ensure that events are
     // processed faster than they're generated
     while (fsmEventQueue.size() > 0) {
-
       Event e = fsmEventQueue.pop();
 
       if (e.type() == Event::Type::kDigInTransition) {
@@ -304,8 +300,8 @@ int main() {
         }
       } else if (e.type() == Event::Type::kAdcConversion) {
         if (e.adcPin() == Gpio::kA2) {
-
-          uint16_t throttle = throttleFilter.filterLms(static_cast<uint16_t>(e.adcValue()));
+          uint16_t throttle =
+              throttleFilter.filterLms(static_cast<uint16_t>(e.adcValue()));
 
           // output non-zero if passed sensitivity margin
           if (throttle < 130) {
@@ -366,6 +362,7 @@ int main() {
 #endif
 
     // TODO: use condition var to signal that events are present in the queue
-    chThdSleepMilliseconds(1); // must be fast enough to deplete event queue quickly enough
+    chThdSleepMilliseconds(
+        1);  // must be fast enough to deplete event queue quickly enough
   }
 }

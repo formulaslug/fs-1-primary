@@ -1,15 +1,18 @@
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
+#include "CanChSubsys.h"
+
 #include <mutex>
-#include "ch.h"
-#include "hal.h"
-#include "mcuconfFs.h"
+
 #include "CanBus.h"
 #include "Event.h"
 #include "EventQueue.h"
-#include "CanChSubsys.h"
+#include "ch.h"
+#include "hal.h"
+#include "mcuconfFs.h"
 
-CanChSubsys::CanChSubsys(CanBus& cb, chibios_rt::Mutex& cbMut,
-    EventQueue& eq) : m_canBus(cb), m_canBusMut(cbMut),
-  m_eventQueue(eq) {}
+CanChSubsys::CanChSubsys(CanBus& cb, chibios_rt::Mutex& cbMut, EventQueue& eq)
+    : m_canBus(cb), m_canBusMut(cbMut), m_eventQueue(eq) {}
 
 void CanChSubsys::startSend(CANTxFrame& msg) {
   std::lock_guard<chibios_rt::Mutex> lock(m_canBusMut);
@@ -57,7 +60,7 @@ void CanChSubsys::runRxThread() {
       // get CAN message
       CANRxFrame msg = m_canBus.dequeueRxMessage();
       // create event
-      std::array<uint16_t, 8> frame = {0,0,0,0,0,0,0,0};
+      std::array<uint16_t, 8> frame = {0, 0, 0, 0, 0, 0, 0, 0};
       // Event e = Event();
       // write data bytes to event params
       for (int i = 0; i < 8; i++) {

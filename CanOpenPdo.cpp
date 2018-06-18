@@ -12,11 +12,12 @@ HeartbeatMessage::HeartbeatMessage(uint16_t data) {
   RTR = CAN_RTR_DATA;
   DLC = 2;
 
-  data8[0] = (data >> 8) & 0xFF; // MSB (32's 3rd byte)
-  data8[1] = data & 0xFF; // LSB (32's 4th byte)
+  data8[0] = (data >> 8) & 0xFF;  // MSB (32's 3rd byte)
+  data8[1] = data & 0xFF;         // LSB (32's 4th byte)
 }
 
-// ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool forwardSwitch) {
+// ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage, bool
+// forwardSwitch) {
 //   IDE = CAN_IDE_EXT;
 //   EID = kCobIdTPDO5;
 //   RTR = CAN_RTR_DATA;
@@ -37,15 +38,18 @@ HeartbeatMessage::HeartbeatMessage(uint16_t data) {
 ThrottleMessage::ThrottleMessage(uint16_t throttleVoltage) {
   IDE = CAN_IDE_EXT;
   // EID = kSysIdFs | kNodeIdPrimary | kFuncIdThrottleValue; //kCobIdTPDO5;
-  EID = 0x908; //kCobIdTPDO5; // used to be 204
+  EID = 0x908;  // kCobIdTPDO5; // used to be 204
   RTR = CAN_RTR_DATA;
   DLC = 2;
 
   // data8[0] = 0xFF; // MSB (32's 3rd byte) (left most byte in DVT)
-  // data8[1] = (throttleVoltage >> 8) & 0xFF; // LSB (32's 4th byte) (right most byte in DVT)
+  // data8[1] = (throttleVoltage >> 8) & 0xFF; // LSB (32's 4th byte) (right
+  // most byte in DVT)
 
-  data8[0] = throttleVoltage & 0xFF; // MSB (32's 3rd byte) (left most byte in DVT)
-  data8[1] = (throttleVoltage >> 8) & 0xFF; // LSB (32's 4th byte) (right most byte in DVT)
+  data8[0] =
+      throttleVoltage & 0xFF;  // MSB (32's 3rd byte) (left most byte in DVT)
+  data8[1] = (throttleVoltage >> 8) &
+             0xFF;  // LSB (32's 4th byte) (right most byte in DVT)
   // data8[2] = 0xFF;
   // data8[3] = 0xFF;
   // TPDO5 tpdo5;

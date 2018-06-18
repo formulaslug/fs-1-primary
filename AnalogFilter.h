@@ -3,7 +3,9 @@
 #pragma once
 
 #include <stdint.h>
+
 #include <array>
+
 #include "CircularBuffer.h"
 
 /**
@@ -16,9 +18,9 @@
  */
 class AnalogFilter {
  public:
-   AnalogFilter();
+  AnalogFilter();
 
-   uint16_t filterLms(uint16_t sample);
+  uint16_t filterLms(uint16_t sample);
 
  private:
   // TODO: implement with circular buffer abstraction

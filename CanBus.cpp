@@ -1,11 +1,12 @@
 // Copyright (c) 2018 Formula Slug. All Rights Reserved.
 
 #include "CanBus.h"
-#include "mcuconfFs.h"
 
 #include <cmath>
 #include <cstdio>
 #include <vector>
+
+#include "mcuconfFs.h"
 
 /* baudrate = 36MHz / ((1 + BRP) * (3 + TS1 + TS2))
  * See STM32F103xx reference manual, 24.7.7 for info on CAN_BTR register.
@@ -32,10 +33,10 @@ constexpr CANConfig MakeConfig(CanBusBaudRate baud, bool loopback) {
       btr |= CAN_BTR_BRP(CAN_BTR_BRP_125k);
       break;
     case CanBusBaudRate::k250k:
-      btr |= CAN_BTR_BRP(CAN_BTR_BRP_250k); // was 11
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_250k);  // was 11
       break;
     case CanBusBaudRate::k500k:
-      btr |= CAN_BTR_BRP(CAN_BTR_BRP_500k); // test hal says 6 (was 5)
+      btr |= CAN_BTR_BRP(CAN_BTR_BRP_500k);  // test hal says 6 (was 5)
       break;
     case CanBusBaudRate::k1M:
       btr |= CAN_BTR_BRP(CAN_BTR_BRP_1M);
@@ -51,7 +52,8 @@ constexpr CANConfig MakeConfig(CanBusBaudRate baud, bool loopback) {
   return {CAN_MCR_ABOM | CAN_MCR_AWUM | CAN_MCR_TXFP, btr};
 }
 
-CanBus::CanBus(uint32_t id, CANDriver *canp, CanBusBaudRate baud, bool loopback) {
+CanBus::CanBus(uint32_t id, CANDriver* canp, CanBusBaudRate baud,
+               bool loopback) {
   m_id = id;
   m_canp = canp;
 
@@ -62,14 +64,14 @@ CanBus::CanBus(uint32_t id, CANDriver *canp, CanBusBaudRate baud, bool loopback)
   if (canp == &CAND1) {
     palSetPadMode(CAN1_RX_PORT, CAN1_RX_PIN, PAL_MODE_ALTERNATE(9));  // CAN RX
     palSetPadMode(CAN1_TX_PORT, CAN1_TX_PIN, PAL_MODE_ALTERNATE(9));  // CAN TX
-    palSetPadMode(CAN1_STATUS_LED_PORT,
-        CAN1_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetPadMode(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN,
+                  PAL_MODE_OUTPUT_PUSHPULL);
     palWritePad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_LOW);
   } else {
     palSetPadMode(CAN2_RX_PORT, CAN2_RX_PIN, PAL_MODE_ALTERNATE(9));  // CAN RX
     palSetPadMode(CAN2_TX_PORT, CAN2_TX_PIN, PAL_MODE_ALTERNATE(9));  // CAN TX
-    palSetPadMode(CAN2_STATUS_LED_PORT,
-        CAN2_STATUS_LED_PIN, PAL_MODE_OUTPUT_PUSHPULL);
+    palSetPadMode(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN,
+                  PAL_MODE_OUTPUT_PUSHPULL);
     palWritePad(CAN2_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_LOW);
   }
 }

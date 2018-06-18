@@ -2,13 +2,15 @@
 
 #pragma once
 
-#include <vector>
 #include <stdint.h>
-#include "hal.h"
-#include "ch.h"
-#include "Gpio.h"
+
+#include <vector>
+
 #include "Event.h"
 #include "EventQueue.h"
+#include "Gpio.h"
+#include "ch.h"
+#include "hal.h"
 #include "mcuconfFs.h"
 
 /**
@@ -31,7 +33,8 @@ class DigInChSubsys {
   ~DigInChSubsys();
 
   /**
-   * Add a pin to the subsystem and start generating transition events immediately
+   * Add a pin to the subsystem and start generating transition events
+   * immediately
    * @param pin Gpio pin (port and pin number)
    */
   bool addPin(DigitalInput pin);
@@ -79,12 +82,10 @@ class DigInChSubsys {
    * @note Maps for constant-time lookup of attrs of the analog input
    */
   // map user's Gpio pin to a pin integer
-  uint32_t kPinMap[kMaxNumPins] = { TRI_STATE_SWITCH_UP_PIN };
+  uint32_t kPinMap[kMaxNumPins] = {TRI_STATE_SWITCH_UP_PIN};
 
   // map user's Gpio pin to chibios port pointer
-  stm32_gpio_t* kPortMap[kMaxNumPins] = {
-    TRI_STATE_SWITCH_UP_PORT
-  };
+  stm32_gpio_t* kPortMap[kMaxNumPins] = {TRI_STATE_SWITCH_UP_PORT};
 
   uint32_t getPinNum(DigitalInput p);
 

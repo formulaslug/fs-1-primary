@@ -1,7 +1,10 @@
-#include "hal.h"
-#include "ch.hpp"
+// Copyright (c) 2018 Formula Slug. All Rights Reserved.
+
 #include "AdcChSubsys.h"
+
 #include "Event.h"
+#include "ch.hpp"
+#include "hal.h"
 #include "mcuconfFs.h"
 
 // TODO: Test system with all four ADC inputs
@@ -16,27 +19,24 @@
 AdcChSubsys::AdcChSubsys(EventQueue& eq) : m_eventQueue(eq) {
   // update the conversion group configuration
   m_adcConversionGroup = {
-    FALSE,
-    0,
-    NULL,
-    NULL,
-    0,                        /* CR1 */
-    ADC_CR2_SWSTART,          /* CR2 */
-    // SMPR1: Samples times for channels 10-17
-    0,
-    // SMPR2: Samples times for channels 0-9
-    // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
-    // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
-    // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-    0, //ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
-    0,                        /* SQR1 */
-    0,                        /* SQR2 */
-    // SQR1: Conversion group sequence 1-6
-    // @brief specify which channels, in which order, are sampled per
-    //        conversion sequence
-    // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
-    //       ADC_CHANNEL_IN[Y]
-    0 //ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
+      FALSE, 0, NULL, NULL, 0, /* CR1 */
+      ADC_CR2_SWSTART,         /* CR2 */
+      // SMPR1: Samples times for channels 10-17
+      0,
+      // SMPR2: Samples times for channels 0-9
+      // @note ADC_SAMPLE_[X] is in cycles of the ADC's clock
+      // @note ADC_SMPR2_SMP_AN[X] corresponds to ADC_CHANNEL_IN[X]
+      // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) | ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+      0,  // ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) |
+          // ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480),
+      0,  /* SQR1 */
+      0,  /* SQR2 */
+      // SQR1: Conversion group sequence 1-6
+      // @brief specify which channels, in which order, are sampled per
+      //        conversion sequence
+      // @note Use ADC_SQR3_SQ[X]_N to indicate sequence number of channel
+      //       ADC_CHANNEL_IN[Y]
+      0  // ADC_SQR3_SQ1_N(ADC_CHANNEL_IN1) | ADC_SQR3_SQ2_N(ADC_CHANNEL_IN2)
   };
 
   /**
@@ -66,15 +66,17 @@ bool AdcChSubsys::addPin(Gpio pin) {
 
   // set the pin mode
   palSetPadMode(kPortMap[static_cast<uint32_t>(pin)],
-      kPinMap[static_cast<uint32_t>(pin)], PAL_MODE_INPUT_ANALOG);
+                kPinMap[static_cast<uint32_t>(pin)], PAL_MODE_INPUT_ANALOG);
 
   // update the conversion group configuration
   // increment the number of channels (2nd member of struct)
   m_adcConversionGroup.num_channels += 1;
   // add sample charge time config (8th member of struct)
-  m_adcConversionGroup.smpr2 |= kSampleChargeTimeMap[static_cast<uint32_t>(pin)];
+  m_adcConversionGroup.smpr2 |=
+      kSampleChargeTimeMap[static_cast<uint32_t>(pin)];
   // add conversion sequence config (11th member of struct)
-  m_adcConversionGroup.sqr3 |= kConversionSequenceMap[static_cast<uint32_t>(pin)];
+  m_adcConversionGroup.sqr3 |=
+      kConversionSequenceMap[static_cast<uint32_t>(pin)];
 
   // add the pin internally
   m_pins[static_cast<uint32_t>(pin)] = true;
@@ -96,8 +98,10 @@ void AdcChSubsys::runThread() {
 
       // package and post event
       std::vector<Event> events;
-      events.push_back(Event(Event::Type::kAdcConversion, Gpio::kA1, 0xfff & m_samples[0]));
-      events.push_back(Event(Event::Type::kAdcConversion, Gpio::kA2, 0xfff & m_samples[1]));
+      events.push_back(
+          Event(Event::Type::kAdcConversion, Gpio::kA1, 0xfff & m_samples[0]));
+      events.push_back(
+          Event(Event::Type::kAdcConversion, Gpio::kA2, 0xfff & m_samples[1]));
       m_eventQueue.push(events);
     }
     // sleep to yield processing until next sample of channels
@@ -120,9 +124,11 @@ bool AdcChSubsys::removePin(Gpio pin) {
   // increment the number of channels (2nd member of struct)
   m_adcConversionGroup.num_channels -= 1;
   // add sample charge time config (8th member of struct)
-  m_adcConversionGroup.smpr2 ^= kSampleChargeTimeMap[static_cast<uint32_t>(pin)];
+  m_adcConversionGroup.smpr2 ^=
+      kSampleChargeTimeMap[static_cast<uint32_t>(pin)];
   // add conversion sequence config (11th member of struct)
-  m_adcConversionGroup.sqr3 ^= kConversionSequenceMap[static_cast<uint32_t>(pin)];
+  m_adcConversionGroup.sqr3 ^=
+      kConversionSequenceMap[static_cast<uint32_t>(pin)];
 
   // start the interface with the new configuration (if at least
   // one pin is still registered in the subsystem)
@@ -133,9 +139,7 @@ bool AdcChSubsys::removePin(Gpio pin) {
 }
 
 // TODO: implement full subsystem, then implement pin adding
-void AdcChSubsys::start() {
-  m_subsysActive = true;
-}
+void AdcChSubsys::start() { m_subsysActive = true; }
 
 /**
  * @note Subsystem should be stopped before any configurations are
