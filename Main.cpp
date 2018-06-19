@@ -173,6 +173,7 @@ int main() {
                 PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
 
   // Init LED states to LOW (including faults)
+  // TODO: init to correct state
   palClearPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);
   palClearPad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN);
   palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);
@@ -190,28 +191,10 @@ int main() {
   chibios_rt::Mutex canBusHvMut;
 
   // Indicate startup - blink then stay on
-  for (uint8_t i = 0; i < 2; i++) {
-    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-                PAL_HIGH);  // IMD
-    palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-                PAL_HIGH);  // AMS
-    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-                PAL_HIGH);  // BSPD
-    palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-                PAL_HIGH);  // RTDS
-    palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
-                PAL_HIGH);  // Brake Light
+  for (uint8_t i = 0; i < 10; i++) {
+    palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
     chThdSleepMilliseconds(200);
-    palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
-                PAL_LOW);  // IMD
-    palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
-                PAL_LOW);  // AMS
-    palWritePad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
-                PAL_LOW);  // Temp
-    palWritePad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
-                PAL_LOW);  // RTDS
-    palWritePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
-                PAL_LOW);  // Brake Light
+    palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
     chThdSleepMilliseconds(200);
   }
 
