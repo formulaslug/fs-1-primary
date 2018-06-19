@@ -21,7 +21,6 @@
 #endif  /* STM32F3 */
 
 #ifdef STM32F4_DISCOVERY
-#error "WHATS HAPPENING"
 #define CAN_BTR_BRP_125k 239
 #define CAN_BTR_BRP_250k 13
 #define CAN_BTR_BRP_500k 6
@@ -67,7 +66,6 @@
 #endif  /* STM32F3 */
 
 #ifdef STM32F4_DISCOVERY
-#error "*************WHATS HAPPENING"
 // Analog inputs
 #define STEERING_VALUE_PORT GPIOA
 #define STEERING_VALUE_PIN GPIOA_SDO // ADC12_IN6 (pin A6)
