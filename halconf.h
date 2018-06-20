@@ -139,7 +139,7 @@
  * @brief   Enables the SERIAL subsystem.
  */
 #if !defined(HAL_USE_SERIAL) || defined(__DOXYGEN__)
-#define HAL_USE_SERIAL              FALSE // NOTE: Disabled b/c was getting an error '#error "SERIAL driver activated but no USART/UART peripheral assigned"'
+#define HAL_USE_SERIAL              FALSE
 #endif
 
 /**
@@ -158,9 +158,10 @@
 
 /**
  * @brief   Enables the UART subsystem.
+ * @note    Serial doesn't need to be enabled for UART/USART interface
  */
 #if !defined(HAL_USE_UART) || defined(__DOXYGEN__)
-#define HAL_USE_UART                FALSE
+#define HAL_USE_UART                TRUE
 #endif
 
 /**

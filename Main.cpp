@@ -20,7 +20,7 @@ constexpr uint32_t kMaxPot =
     4096;  // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-static virtual_timer_t vtLedBspd, vtLedStartup;
+static virtual_timer_t vtLedBspd, vtLedStartup, vtLedUser4;
 
 static void ledBspdOff(void* p) {
   (void)p;
@@ -31,6 +31,159 @@ static void ledStartupOff(void* p) {
   (void)p;
   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
 }
+
+//static void ledUser4Off(void* p) {
+//  (void)p;
+//  palClearPad(GPIOD, GPIOD_LED4);
+//}
+
+
+/**
+ *********************************************************
+ * START Uart Stuff
+ *********************************************************
+ */
+constexpr char kStartByte = '1';
+constexpr char kStopByte = '0';
+constexpr uint8_t kUartOkMask = EVENT_MASK(1);
+constexpr uint8_t kUartChMask = EVENT_MASK(4); // app not ready for char
+static thread_t *uart1RxThread;
+static char lostCharUart1;
+static bool packetBufferRead = false; // do this the right way with signals or something
+
+/*  START MAILBOX STUFF  */
+#define NUM_BUFFERS 16
+#define BUFFERS_SIZE 256
+
+// UART 1
+static char buffers_uart1[NUM_BUFFERS][BUFFERS_SIZE];
+
+static msg_t free_buffers_queue_uart1[NUM_BUFFERS];
+static mailbox_t free_buffers_uart1;
+
+static msg_t filled_buffers_queue_uart1[NUM_BUFFERS];
+static mailbox_t filled_buffers_uart1;
+/*  END MAILBOX STUFF  */
+
+/*
+ * This callback is invoked when a character is received but the application
+ * was not ready to receive it, the character is passed as parameter.
+ */
+static void rxchar(UARTDriver *uartp, uint16_t c) {
+  (void)uartp;
+  //palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  eventmask_t events = kUartChMask;
+
+  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  chVTReset(&vtLedStartup);
+  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+
+  chSysLockFromISR();
+  // queue this character for ingestion
+  lostCharUart1 = c;
+  chEvtSignalI(uart1RxThread, events);
+  chSysUnlockFromISR();
+}
+
+/*
+ * This callback is invoked when a receive buffer has been completely written.
+ */
+static void rxend(UARTDriver *uartp) {
+  (void)uartp;
+  //palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  eventmask_t events = kUartOkMask;
+
+  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  chVTReset(&vtLedStartup);
+  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+
+  chSysLockFromISR();
+  // signal UART 1 RX to read
+  chEvtSignalI(uart1RxThread, events);
+  chSysUnlockFromISR();
+}
+
+
+/*
+ * This callback is invoked when a transmission buffer has been completely
+ * read by the driver.
+ */
+static void txend1(UARTDriver *uartp) {
+  (void)uartp;
+  chSysLockFromISR();
+  packetBufferRead = true;
+  chSysUnlockFromISR();
+}
+
+/*
+ * This callback is invoked when a transmission has physically completed.
+ */
+static void txend2(UARTDriver *uartp) {
+  (void)uartp;
+}
+
+// UART 1 driver configuration structure.
+static UARTConfig uart_cfg_1 = {
+  txend1,          // callback: transmission buffer completely read by the driver
+  txend2,          // callback: a transmission has physically completed
+  rxend,           // callback: a receive buffer has been completely written
+  rxchar,          // callback: a character is received but the
+                   //           application was not ready to receive it (param)
+  NULL,            // callback: receive error w/ errors mask as param
+  115200,          // Bit rate.
+  0,               // Initialization value for the CR1 register.
+  USART_CR2_LINEN, // Initialization value for the CR2 register.
+  0                // Initialization value for the CR3 register.
+};
+
+/*
+ * UART 1 RX Thread
+ */
+static THD_WORKING_AREA(uart1RxThreadFuncWa, 128);
+static THD_FUNCTION(uart1RxThreadFunc, arg) {
+  (void)arg;
+
+  uint16_t rxBuffer[16];
+
+  while (true) {
+    // waiting for any and all events (generated from callback)
+    eventmask_t event = chEvtWaitAny(ALL_EVENTS);
+
+    if (event) {
+      if (event & kUartOkMask) {
+        // handle regular byte
+        uartStopReceive(&UARTD1);
+        uartStartReceive(&UARTD1, 1, rxBuffer);
+        palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+        chVTReset(&vtLedStartup);
+        chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+      }
+      if (event & kUartChMask) {
+        // handle lost char byte
+        rxBuffer[0] = lostCharUart1;
+        palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+        chVTReset(&vtLedStartup);
+        chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+      }
+
+      // add a byte ID to the upper 8 bits
+      // rxBuffer[0] |= Event::kUartByteRxClient << 8;
+
+      // send byte to HSM
+      //void *pbuf;
+      //if (chMBFetch(&free_buffers, (msg_t *)&pbuf, MS2ST(10)) == MSG_OK) {
+      //  pbuf = &rxBuffer[0];
+      //  (void)chMBPost(&filled_buffers, (msg_t)pbuf, MS2ST(10));
+      //}
+    }
+  }
+}
+
+/**
+ *********************************************************
+ * END Uart Stuff
+ *********************************************************
+ */
 
 /*
  * If the range is ordered as (min, max), minimum input values map to 0.
@@ -142,7 +295,22 @@ int main() {
   halInit();
   chSysInit();
 
+  // init mailboxes for UART
+  //chMBObjectInit(&filled_buffers_uart1, filled_buffers_queue_uart1,
+  //    NUM_BUFFERS);
+  //chMBObjectInit(&free_buffers_uart1, free_buffers_queue_uart1, NUM_BUFFERS);
+
+  // Pre-filling the free buffers pool with the available buffers,
+  // the post will not stop because the mailbox is large enough.
+  // UART 1
+  //for (unsigned i = 0; i < NUM_BUFFERS; i++) {
+  //  (void)chMBPost(&free_buffers_uart1, (msg_t)&buffers_uart1[i], TIME_MS2I(10));
+  //}
+
   // Pin initialization
+  // UART TX/RX
+  palSetPadMode(GPIOB, 6, PAL_MODE_ALTERNATE(7)); // USART1_TX, PAL_MODE_OUTPUT_PUSHPULL
+  palSetPadMode(GPIOB, 7, PAL_MODE_ALTERNATE(7)); // USART1_RX, PAL_MODE_OUTPUT_PUSHPULL
   // Analog inputs
   // palSetPadMode(STEERING_VALUE_PORT, STEERING_VALUE_PIN,
   // PAL_MODE_INPUT_ANALOG); palSetPadMode(BRAKE_VALUE_PORT, BRAKE_VALUE_PIN,
@@ -170,7 +338,7 @@ int main() {
   palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
                 PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
   palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN,
-                PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
+                PAL_MODE_OUTPUT_PUSHPULL);
 
   // Init LED states to LOW (including faults)
   // TODO: init to correct state
@@ -193,9 +361,9 @@ int main() {
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 10; i++) {
     palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-    chThdSleepMilliseconds(200);
+    chThdSleepMilliseconds(50);
     palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-    chThdSleepMilliseconds(200);
+    chThdSleepMilliseconds(50);
   }
 
   /**
@@ -234,11 +402,21 @@ int main() {
                     adcThreadFunc, &adcChSubsys);
   chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa), NORMALPRIO,
                     digInThreadFunc, &digInChSubsys);
+  chThdCreateStatic(uart1RxThreadFuncWa, sizeof(uart1RxThreadFuncWa), NORMALPRIO,
+                    uart1RxThreadFunc, NULL);
 
   adcChSubsys.addPin(Gpio::kA1);  // add brake input
   adcChSubsys.addPin(Gpio::kA2);  // add throttle input
 
   digInChSubsys.addPin(DigitalInput::kTriStateUp);
+
+  // Start UART driver 1
+  uartStart(&UARTD1, &uart_cfg_1);
+
+  char txPacketArray[2] = {'a', 'b'};
+
+  uartStopSend(&UARTD1);
+  uartStartSend(&UARTD1, 2, txPacketArray);
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
@@ -246,6 +424,8 @@ int main() {
   AnalogFilter throttleFilter = AnalogFilter();
 
   while (1) {
+    // TODO: Remove this after testing UART
+    chThdSleepMilliseconds(1000*60*24*3);
     // always deplete the queue to help ensure that events are
     // processed faster than they're generated
     while (fsmEventQueue.size() > 0) {
