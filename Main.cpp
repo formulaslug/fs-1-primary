@@ -20,7 +20,7 @@ constexpr uint32_t kMaxPot =
     4096;  // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-static virtual_timer_t vtLedBspd, vtLedStartup, vtLedUser4;
+static virtual_timer_t vtLedBspd, vtLedStartup, vtLedUser4, vtLedCan2Status;
 
 static void ledBspdOff(void* p) {
   (void)p;
@@ -30,6 +30,11 @@ static void ledBspdOff(void* p) {
 static void ledStartupOff(void* p) {
   (void)p;
   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+}
+
+static void ledCan2StatusOff(void* p) {
+  (void)p;
+  palClearPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
 }
 
 //static void ledUser4Off(void* p) {
@@ -143,11 +148,19 @@ static THD_WORKING_AREA(uart1RxThreadFuncWa, 128);
 static THD_FUNCTION(uart1RxThreadFunc, arg) {
   (void)arg;
 
+  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  chVTReset(&vtLedStartup);
+  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+
   uint16_t rxBuffer[16];
 
   while (true) {
     // waiting for any and all events (generated from callback)
     eventmask_t event = chEvtWaitAny(ALL_EVENTS);
+
+    palSetPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
+    chVTReset(&vtLedCan2Status);
+    chVTSet(&vtLedCan2Status, TIME_MS2I(20), ledCan2StatusOff, NULL);
 
     if (event) {
       if (event & kUartOkMask) {
@@ -380,6 +393,10 @@ int main() {
 
   DigInChSubsys digInChSubsys = DigInChSubsys(fsmEventQueue);
 
+  // Start UART driver 1 (make sure before starting UART RX thread)
+  // left off-moving uart start to before creating static thread
+  uartStart(&UARTD1, &uart_cfg_1);
+
   /*
    * Create threads (many of which are driving subsystems)
    */
@@ -410,13 +427,10 @@ int main() {
 
   digInChSubsys.addPin(DigitalInput::kTriStateUp);
 
-  // Start UART driver 1
-  uartStart(&UARTD1, &uart_cfg_1);
-
   char txPacketArray[2] = {'a', 'b'};
 
   uartStopSend(&UARTD1);
-  uartStartSend(&UARTD1, 2, txPacketArray);
+  //uartStartSend(&UARTD1, 0, txPacketArray);
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
