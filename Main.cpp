@@ -86,7 +86,7 @@ static void rxchar(UARTDriver *uartp, uint16_t c) {
 
   palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
   chVTReset(&vtLedStartup);
-  chVTSet(&vtLedStartup, MS2ST(20), ledStartupOff, NULL);
+  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
 
   chSysLockFromISR();
   // queue this character for ingestion
@@ -105,7 +105,7 @@ static void rxend(UARTDriver *uartp) {
 
   palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
   chVTReset(&vtLedStartup);
-  chVTSet(&vtLedStartup, MS2ST(20), ledStartupOff, NULL);
+  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
 
   chSysLockFromISR();
   // signal UART 1 RX to read
@@ -155,7 +155,7 @@ static THD_FUNCTION(uart1RxThreadFunc, arg) {
 
   palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
   chVTReset(&vtLedStartup);
-  chVTSet(&vtLedStartup, MS2ST(20), ledStartupOff, NULL);
+  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
 
   uint16_t rxBuffer[16];
 
@@ -165,7 +165,7 @@ static THD_FUNCTION(uart1RxThreadFunc, arg) {
 
     palSetPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
     chVTReset(&vtLedCan2Status);
-    chVTSet(&vtLedCan2Status, MS2ST(20), ledCan2StatusOff, NULL);
+    chVTSet(&vtLedCan2Status, TIME_MS2I(20), ledCan2StatusOff, NULL);
 
     if (event) {
       if (event & kUartOkMask) {
@@ -174,14 +174,14 @@ static THD_FUNCTION(uart1RxThreadFunc, arg) {
         uartStartReceive(&UARTD3, 1, rxBuffer);
         palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
         chVTReset(&vtLedStartup);
-        chVTSet(&vtLedStartup, MS2ST(20), ledStartupOff, NULL);
+        chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
       }
       if (event & kUartChMask) {
         // handle lost char byte
         rxBuffer[0] = lostCharUart1;
         palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
         chVTReset(&vtLedStartup);
-        chVTSet(&vtLedStartup, MS2ST(20), ledStartupOff, NULL);
+        chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
       }
 
       // add a byte ID to the upper 8 bits
@@ -189,9 +189,9 @@ static THD_FUNCTION(uart1RxThreadFunc, arg) {
 
       // send byte to HSM
       //void *pbuf;
-      //if (chMBFetch(&free_buffers, (msg_t *)&pbuf, MS2ST(10)) == MSG_OK) {
+      //if (chMBFetch(&free_buffers, (msg_t *)&pbuf, TIME_MS2I(10)) == MSG_OK) {
       //  pbuf = &rxBuffer[0];
-      //  (void)chMBPost(&filled_buffers, (msg_t)pbuf, MS2ST(10));
+      //  (void)chMBPost(&filled_buffers, (msg_t)pbuf, TIME_MS2I(10));
       //}
     }
   }
@@ -322,7 +322,7 @@ int main() {
   // the post will not stop because the mailbox is large enough.
   // UART 1
   //for (unsigned i = 0; i < NUM_BUFFERS; i++) {
-  //  (void)chMBPost(&free_buffers_uart1, (msg_t)&buffers_uart1[i], MS2ST(10));
+  //  (void)chMBPost(&free_buffers_uart1, (msg_t)&buffers_uart1[i], TIME_MS2I(10));
   //}
 
   // Pin initialization
@@ -460,13 +460,13 @@ int main() {
             // rising edge
             // flash BSPD LED quickly
             chVTReset(&vtLedBspd);
-            chVTSet(&vtLedBspd, MS2ST(200), ledBspdOff, NULL);
+            chVTSet(&vtLedBspd, TIME_MS2I(200), ledBspdOff, NULL);
             break;
           case false:
             // falling edge
             // flash BSPD LED slowly
             chVTReset(&vtLedBspd);
-            chVTSet(&vtLedBspd, MS2ST(50), ledBspdOff, NULL);
+            chVTSet(&vtLedBspd, TIME_MS2I(50), ledBspdOff, NULL);
             break;
         }
       } else if (e.type() == Event::Type::kCanRx) {
@@ -478,7 +478,7 @@ int main() {
           case kNodeIdCellTemp:
             palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
             chVTReset(&vtLedStartup);
-            chVTSet(&vtLedStartup, MS2ST(50), ledStartupOff, NULL);
+            chVTSet(&vtLedStartup, TIME_MS2I(50), ledStartupOff, NULL);
             break;
           default:
             break;

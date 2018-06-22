@@ -119,7 +119,7 @@ bool CanBus::send(uint64_t data) {
  *       success and a solid LOW indicates continuous failure.
  */
 bool CanBus::send(const CANTxFrame& msg) {
-  if (canTransmit(m_canp, CAN_ANY_MAILBOX, &msg, MS2ST(100)) == MSG_OK) {
+  if (canTransmit(m_canp, CAN_ANY_MAILBOX, &msg, TIME_MS2I(100)) == MSG_OK) {
     // success: HIGH LED
     if (m_canp == &CAND1) {
       palWritePad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN, PAL_HIGH);
