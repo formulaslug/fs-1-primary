@@ -4,7 +4,7 @@
 #define MCUCONF_FS_H
 
 // Current MCU
-#define STM32F405
+#define STM32F4_DISCOVERY
 
 /*********************************************************************
  * @brief Bit Timing Register - Baud Rate Prescalar (BTR_BRP) vals

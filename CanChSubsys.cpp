@@ -45,7 +45,7 @@ void CanChSubsys::runRxThread() {
   chEvtRegister(&(m_canBus.m_canp->rxfull_event), &el, 0);
 
   while (true) {
-    if (chEvtWaitAnyTimeout(ALL_EVENTS, TIME_MS2I(100)) == 0) {
+    if (chEvtWaitAnyTimeout(ALL_EVENTS, MS2ST(100)) == 0) {
       continue;
     }
 
