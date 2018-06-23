@@ -60,20 +60,6 @@ static thread_t *uart1RxThread;
 static char lostCharUart1;
 static bool packetBufferRead = false; // do this the right way with signals or something
 
-/*  START MAILBOX STUFF  */
-#define NUM_BUFFERS 16
-#define BUFFERS_SIZE 256
-
-// UART 1
-static char buffers_uart1[NUM_BUFFERS][BUFFERS_SIZE];
-
-static msg_t free_buffers_queue_uart1[NUM_BUFFERS];
-static mailbox_t free_buffers_uart1;
-
-static msg_t filled_buffers_queue_uart1[NUM_BUFFERS];
-static mailbox_t filled_buffers_uart1;
-/*  END MAILBOX STUFF  */
-
 /*
  * This callback is invoked when a character is received but the application
  * was not ready to receive it, the character is passed as parameter.
@@ -101,7 +87,6 @@ static void rxend(UARTDriver *uartp) {
   chEvtSignalI(uart1RxThread, events);
   chSysUnlockFromISR();
 }
-
 
 /*
  * This callback is invoked when a transmission buffer has been completely
@@ -139,9 +124,7 @@ static UARTConfig uart_cfg_1 = {
  * UART 1 RX Thread
  */
 static THD_WORKING_AREA(uart1RxThreadFuncWa, 128);
-static THD_FUNCTION(uart1RxThreadFunc, arg) {
-  (void)arg;
-
+static THD_FUNCTION(uart1RxThreadFunc, eventQueue) {
   uint16_t rxBuffer[16];
 
   while (true) {
@@ -154,35 +137,23 @@ static THD_FUNCTION(uart1RxThreadFunc, arg) {
 
     if (event) {
 
-      palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-      chVTReset(&vtLedStartup);
-      chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
-
       if (event & kUartOkMask) {
         // handle regular byte
         uartStopReceive(&UARTD3);
         uartStartReceive(&UARTD3, 1, rxBuffer);
-        palSetPad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN);
-        chVTReset(&vtLedCan1Status);
-        chVTSet(&vtLedCan1Status, TIME_MS2I(20), ledCan1StatusOff, NULL);
       }
       if (event & kUartChMask) {
         // handle lost char byte
         rxBuffer[0] = lostCharUart1;
-        palSetPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
-        chVTReset(&vtLedCan2Status);
-        chVTSet(&vtLedCan2Status, TIME_MS2I(20), ledCan2StatusOff, NULL);
       }
 
-      // add a byte ID to the upper 8 bits
-      // rxBuffer[0] |= Event::kUartByteRxClient << 8;
+      // Push byte to FSM's event queue
+      Event e = Event(Event::Type::kUartRx, rxBuffer[0]);
 
-      // send byte to HSM
-      //void *pbuf;
-      //if (chMBFetch(&free_buffers, (msg_t *)&pbuf, TIME_MS2I(10)) == MSG_OK) {
-      //  pbuf = &rxBuffer[0];
-      //  (void)chMBPost(&filled_buffers, (msg_t)pbuf, TIME_MS2I(10));
-      //}
+      // Todo: can't push directly from the callback, need
+      //       to check if the lock is already acquired or
+      //       temporarily stored data internal to the abstraction
+      static_cast<EventQueue*>(eventQueue)->push(e);
     }
   }
 }
@@ -303,18 +274,6 @@ int main() {
   halInit();
   chSysInit();
 
-  // init mailboxes for UART
-  //chMBObjectInit(&filled_buffers_uart1, filled_buffers_queue_uart1,
-  //    NUM_BUFFERS);
-  //chMBObjectInit(&free_buffers_uart1, free_buffers_queue_uart1, NUM_BUFFERS);
-
-  // Pre-filling the free buffers pool with the available buffers,
-  // the post will not stop because the mailbox is large enough.
-  // UART 1
-  //for (unsigned i = 0; i < NUM_BUFFERS; i++) {
-  //  (void)chMBPost(&free_buffers_uart1, (msg_t)&buffers_uart1[i], TIME_MS2I(10));
-  //}
-
   // Pin initialization
   // UART TX/RX
   palSetPadMode(GPIOC, 10, PAL_MODE_ALTERNATE(7)); // USART3_TX, PAL_MODE_OUTPUT_PUSHPULL
@@ -385,8 +344,8 @@ int main() {
   uartStart(&UARTD3, &uart_cfg_1);
   uartStopSend(&UARTD3);
 
-  char txPacketArray[2] = {1, 2};
-  uartStartSend(&UARTD3, 2, txPacketArray);
+  char txPacketArray[6] = {'S','T','A','R','T', ' '};
+  uartStartSend(&UARTD3, 6, txPacketArray);
 
   /*
    * Create threads (many of which are driving subsystems)
@@ -406,23 +365,21 @@ int main() {
   // chThdCreateStatic(throttleThreadFuncWa, sizeof(throttleThreadFuncWa),
   // NORMALPRIO + 1,
   //                   throttleThreadFunc, &canHvChSubsys);
-  chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa), NORMALPRIO,
-                    adcThreadFunc, &adcChSubsys);
+  // TODO: Note: Uncomment adc after resolving lock-queue-caused
+  //       race-condition from uart thread
+  //chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa), NORMALPRIO,
+  //                  adcThreadFunc, &adcChSubsys);
   chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa), NORMALPRIO,
                     digInThreadFunc, &digInChSubsys);
   // thread names necessary for signaling between threads
-  uart1RxThread = chThdCreateStatic(uart1RxThreadFuncWa, sizeof(uart1RxThreadFuncWa), NORMALPRIO,
-                    uart1RxThreadFunc, NULL);
+  uart1RxThread = chThdCreateStatic(uart1RxThreadFuncWa,
+      sizeof(uart1RxThreadFuncWa), NORMALPRIO, uart1RxThreadFunc,
+      &fsmEventQueue);
 
   adcChSubsys.addPin(Gpio::kA1);  // add brake input
   adcChSubsys.addPin(Gpio::kA2);  // add throttle input
 
   digInChSubsys.addPin(DigitalInput::kTriStateUp);
-
-  //char txPacketArray[2] = {'a', 'b'};
-
-  //uartStopSend(&UARTD3);
-  //uartStartSend(&UARTD3, 0, txPacketArray);
 
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
@@ -436,15 +393,23 @@ int main() {
     chThdSleepMilliseconds(50);
   }
 
+  palClearPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
+  chThdSleepMilliseconds(300);
+
   while (1) {
-    // TODO: Remove this after testing UART
-    chThdSleepMilliseconds(1000*60*24*3);
     // always deplete the queue to help ensure that events are
     // processed faster than they're generated
     while (fsmEventQueue.size() > 0) {
       Event e = fsmEventQueue.pop();
 
-      if (e.type() == Event::Type::kDigInTransition) {
+
+      if (e.type() == Event::Type::kUartRx) {
+        uint8_t byteVal = e.getByte();
+        uartStopSend(&UARTD3);
+        char txPacketArray2[1];
+        txPacketArray2[0] = (char)byteVal;
+        uartStartSend(&UARTD3, 1, txPacketArray2);
+      } else if (e.type() == Event::Type::kDigInTransition) {
         palSetPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
         switch (e.digInState()) {
           case true:
