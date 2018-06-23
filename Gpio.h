@@ -7,3 +7,5 @@
 enum class Gpio { kA1 = 0, kA2, kA3, kA6 };
 
 enum class DigitalInput { kTriStateUp = 0 };
+
+enum class UartInterface { kD3 };

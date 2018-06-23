@@ -340,7 +340,6 @@ int main() {
   DigInChSubsys digInChSubsys = DigInChSubsys(fsmEventQueue);
 
   // Start UART driver 1 (make sure before starting UART RX thread)
-  // left off-moving uart start to before creating static thread
   uartStart(&UARTD3, &uart_cfg_1);
   uartStopSend(&UARTD3);
 
