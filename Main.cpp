@@ -3,6 +3,7 @@
 #include <array>
 #include <mutex>
 
+#include "UartChSubsys.h"
 #include "AdcChSubsys.h"
 #include "AnalogFilter.h"
 #include "CanBus.h"
@@ -263,6 +264,16 @@ static THD_FUNCTION(digInThreadFunc, digInChSubsys) {
   static_cast<DigInChSubsys*>(digInChSubsys)->runThread();
 }
 
+/**
+ * UART RX subsystem thread
+ */
+static THD_WORKING_AREA(uartRxThreadFuncWa, 128);
+static THD_FUNCTION(uartRxThreadFunc, uartChSubsys) {
+  chRegSetThreadName("UART RX");
+  static_cast<UartChSubsys*>(uartChSubsys)->runRxThread();
+}
+
+
 int main() {
   /*
    * System initializations.
@@ -339,12 +350,13 @@ int main() {
 
   DigInChSubsys digInChSubsys = DigInChSubsys(fsmEventQueue);
 
-  // Start UART driver 1 (make sure before starting UART RX thread)
-  uartStart(&UARTD3, &uart_cfg_1);
-  uartStopSend(&UARTD3);
+  //// Start UART driver 1 (make sure before starting UART RX thread)
+  //uartStart(&UARTD3, &uart_cfg_1);
+  //uartStopSend(&UARTD3);
+  //char txPacketArray[6] = {'S','T','A','R','T', ' '};
+  //uartStartSend(&UARTD3, 6, txPacketArray);
 
-  char txPacketArray[6] = {'S','T','A','R','T', ' '};
-  uartStartSend(&UARTD3, 6, txPacketArray);
+  UartChSubsys uartChSubsys = UartChSubsys(fsmEventQueue);
 
   /*
    * Create threads (many of which are driving subsystems)
@@ -370,10 +382,13 @@ int main() {
   //                  adcThreadFunc, &adcChSubsys);
   chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa), NORMALPRIO,
                     digInThreadFunc, &digInChSubsys);
-  // thread names necessary for signaling between threads
-  uart1RxThread = chThdCreateStatic(uart1RxThreadFuncWa,
-      sizeof(uart1RxThreadFuncWa), NORMALPRIO, uart1RxThreadFunc,
-      &fsmEventQueue);
+  //// thread names necessary for signaling between threads
+  //uart1RxThread = chThdCreateStatic(uart1RxThreadFuncWa,
+  //    sizeof(uart1RxThreadFuncWa), NORMALPRIO, uart1RxThreadFunc,
+  //    &fsmEventQueue);
+  chThdCreateStatic(uartRxThreadFuncWa,
+      sizeof(uartRxThreadFuncWa), NORMALPRIO, uartRxThreadFunc,
+      &uartChSubsys);
 
   adcChSubsys.addPin(Gpio::kA1);  // add brake input
   adcChSubsys.addPin(Gpio::kA2);  // add throttle input
@@ -383,6 +398,11 @@ int main() {
   // TODO: Fault the system if it doesn't hear from the temp system
   //       within 3 seconds of booting up
   AnalogFilter throttleFilter = AnalogFilter();
+
+  uartChSubsys.addInterface(UartInterface::kD3);
+
+  char txPacketArray[6] = {'S','T','A','R','T', ' '};
+  uartChSubsys.send(txPacketArray, 6);
 
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 5; i++) {
@@ -404,10 +424,13 @@ int main() {
 
       if (e.type() == Event::Type::kUartRx) {
         uint8_t byteVal = e.getByte();
-        uartStopSend(&UARTD3);
+        //uartStopSend(&UARTD3);
+        //char txPacketArray2[1];
+        //txPacketArray2[0] = (char)byteVal;
+        //uartStartSend(&UARTD3, 1, txPacketArray2);
         char txPacketArray2[1];
         txPacketArray2[0] = (char)byteVal;
-        uartStartSend(&UARTD3, 1, txPacketArray2);
+        uartChSubsys.send(txPacketArray2, 1);
       } else if (e.type() == Event::Type::kDigInTransition) {
         palSetPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
         switch (e.digInState()) {

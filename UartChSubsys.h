@@ -45,6 +45,8 @@ class UartChSubsys {
    * @brief Queue a TX UART Frame for transmission
    * TODO: Implement async transmit function, startSend with
    *       signaling to caller on completion
+   * TODO: Add interface "ui" to send params to specify which
+   *       interface
    */
   void send(char * str, uint16_t len);
 
