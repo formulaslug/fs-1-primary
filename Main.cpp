@@ -20,11 +20,11 @@ constexpr uint32_t kMaxPot =
     4096;  // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-static virtual_timer_t vtLedBspd, vtLedStartup, vtLedUser4, vtLedCan2Status;
+static virtual_timer_t vtLedBspd, vtLedStartup, vtLedCan2Status;
 
 static void ledBspdOff(void* p) {
   (void)p;
-  palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);  // IMD
+  palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);
 }
 
 static void ledStartupOff(void* p) {
@@ -37,22 +37,12 @@ static void ledCan2StatusOff(void* p) {
   palClearPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
 }
 
-//static void ledUser4Off(void* p) {
-//  (void)p;
-//  palClearPad(GPIOD, GPIOD_LED4);
-//}
-
 
 /**
  *********************************************************
  * START Uart Stuff
  *********************************************************
  */
-// LEFT OFF - need to upgrade chibios version to the one on SDP
-// LEFT OFF - downgraded chibios version to SDP, still not indication
-//            of the UART thread starting
-
-
 constexpr char kStartByte = '1';
 constexpr char kStopByte = '0';
 constexpr uint8_t kUartOkMask = EVENT_MASK(1);
