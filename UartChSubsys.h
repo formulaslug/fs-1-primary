@@ -56,7 +56,12 @@ class UartChSubsys {
    */
   void runRxThread();
 
+  // TODO: Make private
+  void rxend(UARTDriver *uartp);
+
  private:
+  static constexpr uint8_t kUartOkMask = EVENT_MASK(1);
+  static constexpr uint8_t kUartChMask = EVENT_MASK(4);
   UARTDriver *m_uartp;
   UARTConfig m_uartConfig;
   chibios_rt::Mutex m_uartMut;

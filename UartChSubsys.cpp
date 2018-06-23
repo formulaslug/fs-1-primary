@@ -39,11 +39,15 @@ void UartChSubsys::addInterface(UartInterface ui) {
   // set default config
   // TODO: Initialize interface pins
   // TODO: Get UART callbacks working in order to signal the thread
+  //       (read the article on this before continuing with
+  //       implementation). Can also checkout how std::thread
+  //       abstracts on top of pthreads, given that pthreads take a
+  //       void pointer for the function to call
   m_uartConfig = {
     NULL,//txend1,          // callback: transmission buffer completely read
                      //           by the driver
     NULL,//txend2,          // callback: a transmission has physically completed
-    NULL,//rxend,           // callback: a receive buffer has been completely
+    rxend,//rxend,           // callback: a receive buffer has been completely
                      //           written
     NULL,//rxchar,          // callback: a character is received but the
                      //           application was not ready to receive
@@ -120,3 +124,16 @@ void UartChSubsys::runRxThread() {
     //}
   }
 }
+
+void UartChSubsys::rxend(UARTDriver *uartp) {
+  (void)uartp;
+  eventmask_t events = kUartOkMask;
+
+  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+
+  //chSysLockFromISR();
+  //// signal UART 1 RX to read
+  //chEvtSignalI(uart1RxThread, events);
+  //chSysUnlockFromISR();
+}
+
