@@ -20,8 +20,13 @@ constexpr uint32_t kMaxPot =
     4096;  // out of 4096 -- 512 is 1/8 max throttle value
 constexpr uint32_t kPotTolerance = 10;
 
-static virtual_timer_t vtLedBspd, vtLedStartup, vtLedCan2Status;
+static virtual_timer_t vtLedBspd, vtLedStartup, vtLedCan2Status,
+                       vtLedCan1Status;
 
+// TODO: Implement
+//       1) TimerChSubsys that supports periodic and one-off lambdas and funcs and/or send signals to provided threads
+//       2) DigOutChSubsys that uses Timer subsys for async output control
+//       3) Down the road, implement a thread abstraction on top of chibios
 static void ledBspdOff(void* p) {
   (void)p;
   palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);
@@ -32,11 +37,15 @@ static void ledStartupOff(void* p) {
   palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
 }
 
+static void ledCan1StatusOff(void* p) {
+  (void)p;
+  palClearPad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN);
+}
+
 static void ledCan2StatusOff(void* p) {
   (void)p;
   palClearPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
 }
-
 
 /**
  *********************************************************
@@ -71,12 +80,7 @@ static mailbox_t filled_buffers_uart1;
  */
 static void rxchar(UARTDriver *uartp, uint16_t c) {
   (void)uartp;
-  //palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
   eventmask_t events = kUartChMask;
-
-  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-  chVTReset(&vtLedStartup);
-  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
 
   chSysLockFromISR();
   // queue this character for ingestion
@@ -90,12 +94,7 @@ static void rxchar(UARTDriver *uartp, uint16_t c) {
  */
 static void rxend(UARTDriver *uartp) {
   (void)uartp;
-  //palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
   eventmask_t events = kUartOkMask;
-
-  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-  chVTReset(&vtLedStartup);
-  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
 
   chSysLockFromISR();
   // signal UART 1 RX to read
@@ -143,35 +142,36 @@ static THD_WORKING_AREA(uart1RxThreadFuncWa, 128);
 static THD_FUNCTION(uart1RxThreadFunc, arg) {
   (void)arg;
 
-  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-  chVTReset(&vtLedStartup);
-  chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
-
   uint16_t rxBuffer[16];
 
   while (true) {
+    // start the first receive
+    uartStopReceive(&UARTD3);
+    uartStartReceive(&UARTD3, 1, rxBuffer);
+
     // waiting for any and all events (generated from callback)
     eventmask_t event = chEvtWaitAny(ALL_EVENTS);
 
-    palSetPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
-    chVTReset(&vtLedCan2Status);
-    chVTSet(&vtLedCan2Status, TIME_MS2I(20), ledCan2StatusOff, NULL);
-
     if (event) {
+
+      palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+      chVTReset(&vtLedStartup);
+      chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+
       if (event & kUartOkMask) {
         // handle regular byte
         uartStopReceive(&UARTD3);
         uartStartReceive(&UARTD3, 1, rxBuffer);
-        palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-        chVTReset(&vtLedStartup);
-        chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+        palSetPad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN);
+        chVTReset(&vtLedCan1Status);
+        chVTSet(&vtLedCan1Status, TIME_MS2I(20), ledCan1StatusOff, NULL);
       }
       if (event & kUartChMask) {
         // handle lost char byte
         rxBuffer[0] = lostCharUart1;
-        palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-        chVTReset(&vtLedStartup);
-        chVTSet(&vtLedStartup, TIME_MS2I(20), ledStartupOff, NULL);
+        palSetPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
+        chVTReset(&vtLedCan2Status);
+        chVTSet(&vtLedCan2Status, TIME_MS2I(20), ledCan2StatusOff, NULL);
       }
 
       // add a byte ID to the upper 8 bits
@@ -410,7 +410,8 @@ int main() {
                     adcThreadFunc, &adcChSubsys);
   chThdCreateStatic(digInThreadFuncWa, sizeof(digInThreadFuncWa), NORMALPRIO,
                     digInThreadFunc, &digInChSubsys);
-  chThdCreateStatic(uart1RxThreadFuncWa, sizeof(uart1RxThreadFuncWa), NORMALPRIO,
+  // thread names necessary for signaling between threads
+  uart1RxThread = chThdCreateStatic(uart1RxThreadFuncWa, sizeof(uart1RxThreadFuncWa), NORMALPRIO,
                     uart1RxThreadFunc, NULL);
 
   adcChSubsys.addPin(Gpio::kA1);  // add brake input
