@@ -12,11 +12,13 @@
 class Event {
  public:
   // Event types
-  enum Type { kNone, kCanRx, kTimerTimeout, kAdcConversion, kDigInTransition };
+  enum Type { kNone, kCanRx, kTimerTimeout, kAdcConversion,
+    kDigInTransition, kUartRx };
 
   Event(Type t, Gpio adcPin, uint32_t adcValue);
   Event(Type t, uint32_t canEid, std::array<uint16_t, 8> canFrame);
   Event(Type t, DigitalInput pin, bool currentState);
+  Event(Type t, char byte);
   Event();
 
   Type type();
@@ -28,6 +30,7 @@ class Event {
   std::array<uint16_t, 8> canFrame();
   DigitalInput digInPin();
   bool digInState();
+  char getByte();
 
  private:
   Type m_type = kNone;

@@ -25,6 +25,10 @@ Event::Event(Type t, DigitalInput pin, bool currentState) : m_type(t) {
   m_params[1] = static_cast<uint16_t>(currentState);
 }
 
+Event::Event(Type t, char byte) : m_type(t) {
+  m_params[0] = static_cast<char>(byte);
+}
+
 Event::Type Event::type() { return m_type; }
 
 /**
@@ -57,3 +61,7 @@ DigitalInput Event::digInPin() {
 }
 
 bool Event::digInState() { return static_cast<bool>(m_params[1]); }
+
+char Event::getByte() {
+  return static_cast<char>(m_params[0]);
+}
