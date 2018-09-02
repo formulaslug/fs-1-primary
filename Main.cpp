@@ -287,6 +287,7 @@ int main() {
 
   // Pin initialization
   // UART TX/RX
+  // TODO: Change to #def'd vars
   palSetPadMode(GPIOC, 10, PAL_MODE_ALTERNATE(7)); // USART3_TX, PAL_MODE_OUTPUT_PUSHPULL
   palSetPadMode(GPIOC, 11, PAL_MODE_ALTERNATE(7)); // USART3_RX, PAL_MODE_OUTPUT_PUSHPULL
   // Analog inputs
@@ -350,7 +351,7 @@ int main() {
 
   DigInChSubsys digInChSubsys = DigInChSubsys(fsmEventQueue);
 
-  //// Start UART driver 1 (make sure before starting UART RX thread)
+  // Start UART driver 1 (make sure before starting UART RX thread)
   //uartStart(&UARTD3, &uart_cfg_1);
   //uartStopSend(&UARTD3);
   //char txPacketArray[6] = {'S','T','A','R','T', ' '};
@@ -401,8 +402,10 @@ int main() {
 
   uartChSubsys.addInterface(UartInterface::kD3);
 
-  char txPacketArray[6] = {'S','T','A','R','T', ' '};
+  char txPacketArray[6] = {'A','B','C','D','E', ' '};
+  char txPacketArray2[6] = {'F','G','H','I','J', ' '};
   uartChSubsys.send(txPacketArray, 6);
+  uartChSubsys.send(txPacketArray2, 6);
 
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 5; i++) {
@@ -421,12 +424,10 @@ int main() {
     while (fsmEventQueue.size() > 0) {
       Event e = fsmEventQueue.pop();
 
-
       if (e.type() == Event::Type::kUartRx) {
+        //palTogglePad(STARTUP_LED_PORT, STARTUP_LED_PIN);
         uint8_t byteVal = e.getByte();
         //uartStopSend(&UARTD3);
-        //char txPacketArray2[1];
-        //txPacketArray2[0] = (char)byteVal;
         //uartStartSend(&UARTD3, 1, txPacketArray2);
         char txPacketArray2[1];
         txPacketArray2[0] = (char)byteVal;

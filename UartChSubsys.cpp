@@ -11,6 +11,11 @@
 #include "hal.h"
 #include "mcuconfFs.h"
 
+
+// Definitions for static members
+std::array<UARTDriver *,4> UartChSubsys::registeredDrivers = {};
+std::array<UartChSubsys *,4> UartChSubsys::driverToSubsysLookup = {};
+
 /**
  * TODO: - Remove driver pointer from constructor
  *       - Add an addInterface function that takes a UartInterface
@@ -44,12 +49,12 @@ void UartChSubsys::addInterface(UartInterface ui) {
   //       abstracts on top of pthreads, given that pthreads take a
   //       void pointer for the function to call
   m_uartConfig = {
-    NULL,//txend1,          // callback: transmission buffer completely read
-                     //           by the driver
-    NULL,//txend2,          // callback: a transmission has physically completed
-    rxend,//rxend,           // callback: a receive buffer has been completely
-                     //           written
-    NULL,//rxchar,          // callback: a character is received but the
+    &UartChSubsys::txEmpty,   //txend1,// callback: transmission buffer completely read
+                     // by the driver
+    NULL,   //txend2,// callback: a transmission has physically completed
+    &UartChSubsys::rxDone, // callback: a receive buffer has been
+                                  //completelywritten
+    NULL,   //rxchar,// callback: a character is received but the
                      //           application was not ready to receive
                      //           it (param)
     NULL,            // callback: receive error w/ errors mask as param
@@ -60,6 +65,11 @@ void UartChSubsys::addInterface(UartInterface ui) {
   };
   // set default driver (TODO: make it based on ui)
   m_uartp = &UARTD3;
+  // register driver statically on class for lookup in static callbacks
+  UartChSubsys::registeredDrivers[0] = m_uartp;
+    //UartChSubsys::registeredDrivers.size()] = m_uartp;
+  UartChSubsys::driverToSubsysLookup[0] = this;
+      //UartChSubsys::driverToSubsysLookup.size()] = this;
   // start interface with default config
   uartStart(m_uartp, &m_uartConfig);
 }
@@ -78,26 +88,28 @@ void UartChSubsys::send(char * str, uint16_t len) {
 }
 
 /*
- * @brief subsystem run function for CAN TX called from within a
+ * @brief subsystem run function for CAN RX called from within a
  *        ChibiOS static thread
  * TODO: Implement callbacks for RX
  */
 void UartChSubsys::runRxThread() {
-  uint16_t rxBuffer[11] = {};
+  //uint16_t rxBuffer[11] = {};
 
-  while (true) {
+  //while (true) {
     // start the first receive
     uartStopReceive(m_uartp);
-    uartStartReceive(m_uartp, 1, rxBuffer);
+    uartStartReceive(m_uartp, 1, m_rxBuffer);
 
-    Event e = Event(Event::Type::kUartRx, rxBuffer[0]);
-    m_eventQueue.push(e);
+    //Event e = Event(Event::Type::kUartRx, m_rxBuffer[0]);
+    //m_eventQueue.push(e);
+
+    // TODO: Add uartStopRecevei, startreceive combo in the rx callback
 
     //std::vector<Event> events;
     //events.push_back(Event(Event::Type::kUartRx, rxBuffer[0]));
     //m_eventQueue.push(events);
 
-    chThdSleepMilliseconds(100);
+    chThdSleepMilliseconds(1000*60*60);
 
     //// waiting for any and all events (generated from callback)
     //eventmask_t event = chEvtWaitAny(ALL_EVENTS);
@@ -113,27 +125,59 @@ void UartChSubsys::runRxThread() {
     //    // handle lost char byte
     //    rxBuffer[0] = lostCharUart1;
     //  }
-
-    //  // Push byte to FSM's event queue
-    //  Event e = Event(Event::Type::kUartRx, rxBuffer[0]);
-
+//  // Push byte to FSM's event queue //  Event e = Event(Event::Type::kUartRx, rxBuffer[0]); 
     //  // Todo: can't push directly from the callback, need
     //  //       to check if the lock is already acquired or
     //  //       temporarily stored data internal to the abstraction
     //  static_cast<EventQueue*>(eventQueue)->push(e);
     //}
-  }
+  //}
 }
 
-void UartChSubsys::rxend(UARTDriver *uartp) {
+void UartChSubsys::rxDone(UARTDriver *uartp) {
+  (void)uartp;
+  //eventmask_t events = kUartOkMask;
+
+
+  // find class pointer corresponding to this uart driver via static
+  // lookup table
+  UartChSubsys *uartChSubsys = nullptr;
+  for (uint32_t i = 0; i < UartChSubsys::registeredDrivers.size(); i++) {
+    UARTDriver *_uartp = UartChSubsys::registeredDrivers[i];
+    if (_uartp == uartp) {
+      palTogglePad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+      // found driver's class... so set it
+      uartChSubsys = UartChSubsys::driverToSubsysLookup[i];
+    }
+  }
+
+  if (uartChSubsys != nullptr) {
+    // push byte-read event to the subsystem's event consumer
+    Event e = Event(Event::Type::kUartRx, uartChSubsys->m_rxBuffer[0]);
+    uartChSubsys->m_eventQueue.push(e);
+    // start next rx
+    uartStopReceive(uartp);
+    uartStartReceive(uartp, 1, uartChSubsys->m_rxBuffer);
+  } else {
+    // ERROR
+    // ...
+  }
+
+  //chSysLockFromISR();
+  //// signal UART 1 RX to read
+  //chEvtSignalI(uart1RxThread, events);
+  //chSysUnlockFromISR();
+
+}
+
+void UartChSubsys::txEmpty(UARTDriver *uartp) {
   (void)uartp;
   eventmask_t events = kUartOkMask;
 
-  palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  //palTogglePad(STARTUP_LED_PORT, STARTUP_LED_PIN);
 
   //chSysLockFromISR();
   //// signal UART 1 RX to read
   //chEvtSignalI(uart1RxThread, events);
   //chSysUnlockFromISR();
 }
-
