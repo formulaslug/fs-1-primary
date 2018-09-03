@@ -17,6 +17,22 @@ Event EventQueue::pop() {
   return m_queue.PopFront();
 }
 
+bool EventQueue::tryPush(Event e) {
+  // acquire lock in current scope
+  bool didAcquire = m_queueMut.tryLock();
+  //std::unique_lock<chibios_rt::Mutex> queueLock(m_queueMut,
+  //    std::try_to_lock);
+  if (!didAcquire) {
+    // don't push, indicate failure
+    return false;
+  } else {
+    // push item, indicate success
+    m_queue.PushBack(e);
+    m_queueMut.unlock();
+    return true;
+  }
+}
+
 void EventQueue::push(Event e) {
   // acquire lock in current scope
   std::lock_guard<chibios_rt::Mutex> queueGuard(m_queueMut);

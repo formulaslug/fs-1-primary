@@ -402,11 +402,6 @@ int main() {
 
   uartChSubsys.addInterface(UartInterface::kD3);
 
-  char txPacketArray[6] = {'A','B','C','D','E', ' '};
-  char txPacketArray2[6] = {'F','G','H','I','J', ' '};
-  uartChSubsys.send(txPacketArray, 6);
-  uartChSubsys.send(txPacketArray2, 6);
-
   // Indicate startup - blink then stay on
   for (uint8_t i = 0; i < 5; i++) {
     palSetPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
@@ -416,7 +411,13 @@ int main() {
   }
 
   palClearPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
+  palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
   chThdSleepMilliseconds(300);
+
+  char txPacketArray[6] = {'A','B','C','D','E', ' '};
+  char txPacketArray2[6] = {'F','G','H','I','J', ' '};
+  uartChSubsys.send(txPacketArray, 6);
+  uartChSubsys.send(txPacketArray2, 6);
 
   while (1) {
     // always deplete the queue to help ensure that events are

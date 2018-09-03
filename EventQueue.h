@@ -27,6 +27,11 @@ class EventQueue {
   // TODO: Rename to, correct, dequeue
   Event pop();
 
+  // @brief thread-safe non-blocking queue push, at the cost of
+  //        potential failure to push
+  // @return Success in pushing as true, Failure to push as false
+  bool tryPush(Event e);
+
   // @brief thread-safe queue push
   // TODO: Rename to, correct, enqueue
   void push(Event e);

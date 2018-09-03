@@ -3,6 +3,7 @@
 #include "UartChSubsys.h"
 
 #include <mutex>
+#include <cstring>
 
 #include "Gpio.h"
 #include "Event.h"
@@ -10,7 +11,6 @@
 #include "ch.h"
 #include "hal.h"
 #include "mcuconfFs.h"
-
 
 // Definitions for static members
 std::array<UARTDriver *,4> UartChSubsys::registeredDrivers = {};
@@ -74,110 +74,117 @@ void UartChSubsys::addInterface(UartInterface ui) {
   uartStart(m_uartp, &m_uartConfig);
 }
 
-/**
- * TODO: The UART transmit here is actually non-blockin, which it
- *        shouldn't be as it defeats the purpose of acquiring a lock
- *        on the interface before transmitting. Get blocking version
- *        working, then implement non-blocking the right way.
+/*
+ * TODO: Consider implementing a faster (but less flexible) version,
+         with less impact on the calling thread, that requires the
+         calling thread to "permanently" allocate mem for the passed
+         str
  */
 void UartChSubsys::send(char * str, uint16_t len) {
-  std::lock_guard<chibios_rt::Mutex> lock(m_uartMut);
-  // non-blocking transmit
-  uartStopSend(m_uartp);
-  uartStartSend(m_uartp, len, str);
+  // start data transmit if interface is ready
+  if (m_d3IsReady) {
+    m_d3IsReady = false;
+    // copy string contents to class memory
+    std::memcpy(m_txBuffer, str, len);
+    // start transmit from the copied memory
+    uartStopSend(m_uartp);
+    uartStartSend(m_uartp, len, m_txBuffer);
+  } else {
+    // TODO: This function ideally doesn't affect timing in calling
+    //       thread, having occasional copying of entire block will
+    //       certainly effect timing
+    // otherwise, queue for later
+    std::lock_guard<chibios_rt::Mutex> txQueueGuard(m_d3TxQueueMut);
+    for (uint32_t i = 0; i < len; i++) {
+      // push byte
+      m_d3TxQueue.PushBack(*(str + i));
+    }
+  }
 }
 
 /*
  * @brief subsystem run function for CAN RX called from within a
  *        ChibiOS static thread
- * TODO: Implement callbacks for RX
+ * TODO: Use this thread to generate RX msg events and anything else
+ *       that can't always be performed in the static callbacks
  */
 void UartChSubsys::runRxThread() {
-  //uint16_t rxBuffer[11] = {};
+  uartStopReceive(m_uartp);
+  uartStartReceive(m_uartp, 1, m_rxBuffer);
 
-  //while (true) {
-    // start the first receive
-    uartStopReceive(m_uartp);
-    uartStartReceive(m_uartp, 1, m_rxBuffer);
-
-    //Event e = Event(Event::Type::kUartRx, m_rxBuffer[0]);
-    //m_eventQueue.push(e);
-
-    // TODO: Add uartStopRecevei, startreceive combo in the rx callback
-
-    //std::vector<Event> events;
-    //events.push_back(Event(Event::Type::kUartRx, rxBuffer[0]));
-    //m_eventQueue.push(events);
-
-    chThdSleepMilliseconds(1000*60*60);
-
-    //// waiting for any and all events (generated from callback)
-    //eventmask_t event = chEvtWaitAny(ALL_EVENTS);
-
-    //if (event) {
-
-    //  if (event & kUartOkMask) {
-    //    // handle regular byte
-    //    uartStopReceive(&UARTD3);
-    //    uartStartReceive(&UARTD3, 1, rxBuffer);
-    //  }
-    //  if (event & kUartChMask) {
-    //    // handle lost char byte
-    //    rxBuffer[0] = lostCharUart1;
-    //  }
-//  // Push byte to FSM's event queue //  Event e = Event(Event::Type::kUartRx, rxBuffer[0]); 
-    //  // Todo: can't push directly from the callback, need
-    //  //       to check if the lock is already acquired or
-    //  //       temporarily stored data internal to the abstraction
-    //  static_cast<EventQueue*>(eventQueue)->push(e);
-    //}
-  //}
+  // sleep forever
+  chThdSleepMilliseconds(1000*60*60*24);
 }
 
-void UartChSubsys::rxDone(UARTDriver *uartp) {
-  (void)uartp;
-  //eventmask_t events = kUartOkMask;
-
-
-  // find class pointer corresponding to this uart driver via static
-  // lookup table
+UartChSubsys * UartChSubsys::getDriversSubsys(UARTDriver *uartp) {
   UartChSubsys *uartChSubsys = nullptr;
+
   for (uint32_t i = 0; i < UartChSubsys::registeredDrivers.size(); i++) {
     UARTDriver *_uartp = UartChSubsys::registeredDrivers[i];
     if (_uartp == uartp) {
-      palTogglePad(STARTUP_LED_PORT, STARTUP_LED_PIN);
-      // found driver's class... so set it
+      // found driver's subsys instance
       uartChSubsys = UartChSubsys::driverToSubsysLookup[i];
     }
   }
 
-  if (uartChSubsys != nullptr) {
+  return uartChSubsys;
+}
+
+void UartChSubsys::rxDone(UARTDriver *uartp) {
+  // find class pointer corresponding to this uart driver via static
+  // lookup table
+  UartChSubsys *_this = UartChSubsys::getDriversSubsys(uartp);
+
+  if (_this != nullptr) {
     // push byte-read event to the subsystem's event consumer
-    Event e = Event(Event::Type::kUartRx, uartChSubsys->m_rxBuffer[0]);
-    uartChSubsys->m_eventQueue.push(e);
+    // @TODO fix this limit in event generation, limiting RX bytes
+    //       that can be processed by the FSM
+    Event e = Event(Event::Type::kUartRx, _this->m_rxBuffer[0]);
+    // if the event queue cannot be immediately acquired, the push fails
+    bool success = _this->m_eventQueue.tryPush(e);
+    if (!success) {
+      // @TODO did not immediately acquire lock, must postpone pushing
+      //       the event to the queue until after the callback exits
+      //       (maybe should just always do this)
+      palTogglePad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+    }
     // start next rx
     uartStopReceive(uartp);
-    uartStartReceive(uartp, 1, uartChSubsys->m_rxBuffer);
+    uartStartReceive(uartp, 1, _this->m_rxBuffer);
   } else {
     // ERROR
     // ...
   }
-
-  //chSysLockFromISR();
-  //// signal UART 1 RX to read
-  //chEvtSignalI(uart1RxThread, events);
-  //chSysUnlockFromISR();
-
 }
 
 void UartChSubsys::txEmpty(UARTDriver *uartp) {
-  (void)uartp;
-  eventmask_t events = kUartOkMask;
+  // this is called every time the UART interface finishes copying
+  // over bytes from a software-level tx buffer (the one passed to
+  // the async start send function)
 
-  //palTogglePad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+  UartChSubsys *_this = UartChSubsys::getDriversSubsys(uartp);
 
-  //chSysLockFromISR();
-  //// signal UART 1 RX to read
-  //chEvtSignalI(uart1RxThread, events);
-  //chSysUnlockFromISR();
+  // if the queue is non-empty, acquire, copy up to kMaxMsgLen of its
+  // content to the output buffer and start a new transmission
+  if (_this->m_d3TxQueue.Size() > 0) {
+    // acquire lock guard in current scope
+
+    // @TODO Is this lock really necessary? What's wrong with the size
+    //       changing between the corresponding instructions
+    //std::lock_guard<chibios_rt::Mutex> lock(_this->m_d3TxQueueMut);
+
+    // determine num tx bytes to transmit, clamping to kMaxMsgLen
+    uint32_t txCount = _this->m_d3TxQueue.Size() > kMaxMsgLen
+      ? kMaxMsgLen : _this->m_d3TxQueue.Size();
+    // copy over msg contents
+    for (uint32_t i = 0; i < txCount; i++) {
+      _this->m_txBuffer[i] = _this->m_d3TxQueue.PopFront();
+    }
+    // start the tx
+    uartStopSend(uartp);
+    uartStartSend(uartp, txCount, _this->m_txBuffer);
+  } else {
+    // otherwise, clear the interface ready flag
+    _this->m_d3IsReady = true;
+  }
 }

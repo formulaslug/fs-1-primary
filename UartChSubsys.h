@@ -12,16 +12,30 @@
 #include "EventQueue.h"
 #include "ch.h"
 #include "hal.h"
-
-
-// LEFT OFF: static callback good. Need globals for state,
-//           encapsulated within class (private) if possible
+#include "CircularBuffer.h"
 
 /**
  *
  * UART subsystem, sitting on top of the chibios UART driver. Only one
  * subsystem should be instantiated, and currently, only one driver
  * interface (UARTD3 is supported)
+ *
+ * @TODO Currently has limited throughput on event generation. This is
+ *       possibly due to the fsm (event queue consumer) not being able
+ *       to process the events quickly enough, although not sure why
+ *       exactly that is causing things to break. The event queue is
+ *       built on top of the CircularBuffer class, which should just
+ *       overwrite elements when the buffer overflows. Either way,
+ *       having a larger, fixed-size packet would improve things
+ *       - - - - - - - - - - - - - - - - - - - - 
+ *       OH, actually, it's definitely that IF the lock on a shared
+ *       resource in one of the static callbacks cannot be immediately
+ *       acquired, the kernel gets upset b/c this basically results in
+ *       an ISR taking a lifetime to exit. This issue is only likely
+ *       to occur at high throughput over serial RX
+ *       - - - - - - - - - - - - - - - - - - - - 
+ *       Yep, that was it. Now just need a mechanism to postpone event
+ *       generation when the lock isn't successfully acquired
  *
  * @note The UART subsystem currently only supports one interface,
  *       which is currently hardcoded to UARTD3. Supporting mutliple
@@ -31,7 +45,7 @@
  *       respective interfaces in the thread run function (and
  *       defining them with the callbacks passed to the config)
  */
-class UartChSubsys {
+class UartChSubsys 
  public:
   /**
    * @param eventQueue Reference to queue to send this subsystem's
@@ -46,7 +60,10 @@ class UartChSubsys {
   void addInterface(UartInterface ui);
 
   /**
-   * @brief Queue a TX UART Frame for transmission
+   * @brief Queue a TX UART Frame for async transmission
+   * @note The contents of str is immediately copied to memory
+   *       allocated by the subsystem instance, and can therefore be
+   *       forgotten about after send() exits
    * TODO: Implement async transmit function, startSend with
    *       signaling to caller on completion
    * TODO: Add interface "ui" to send params to specify which
@@ -80,6 +97,18 @@ class UartChSubsys {
   //        completely written to hardware interface buffers
   static void txEmpty(UARTDriver *uartp);
 
+  // @brief Return pointer to the instance of self associated with the
+  //        passed driver
+  // @note Since this is a subsystem, it probably shouldn't need or
+  //       have multiple instances, but who knows (currently always
+  //       returns the single subsys instance)
+  static UartChSubsys *getDriversSubsys(UARTDriver *uartp);
+
+  // Max length of messages in bytes. Anything longer than this many
+  // bytes must be broken down into multiple messages
+  static constexpr uint32_t kMaxMsgLen = 100;
+
+ private:
   /*
    * @note To navigate the ChibiOS constraint of static UART callbacks
    *       with a predefined signature (no arbitrary params), and
@@ -98,7 +127,12 @@ class UartChSubsys {
   // members from static C-style callbacks
   static std::array<UartChSubsys *,4> driverToSubsysLookup;
 
- private:
+  // UARTDriver UARTD3 specific fields (need to generalize)
+  CircularBuffer<char> m_d3TxQueue{kMaxMsgLen*2};
+  chibios_rt::Mutex m_d3TxQueueMut;
+  bool m_d3IsReady = true;
+  char m_txBuffer[UartChSubsys::kMaxMsgLen] = {};
+
   static constexpr uint8_t kUartOkMask = EVENT_MASK(1);
   static constexpr uint8_t kUartChMask = EVENT_MASK(4);
   uint16_t m_rxBuffer[11];
