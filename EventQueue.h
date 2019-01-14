@@ -7,8 +7,8 @@
 #include <mutex>
 #include <vector>
 
-#include "CircularBuffer.h"
 #include "Event.h"
+#include "WPILib/circular_buffer.h"
 #include "ch.hpp"
 #include "hal.h"
 
@@ -17,7 +17,7 @@
  */
 class EventQueue {
  private:
-  CircularBuffer<Event> m_queue{20};
+  frc::circular_buffer<Event> m_queue{20};
   chibios_rt::Mutex m_queueMut;
 
  public:

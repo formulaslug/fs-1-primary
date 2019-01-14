@@ -194,13 +194,13 @@ void CanBus::printRxMessage(const CANRxFrame& msg) const {
  *       queue after so that they can be printed
  */
 void CanBus::processTxMessages() {
-  while (m_txQueue.Size() > 0) {
+  while (m_txQueue.size() > 0) {
     // write message
     send(m_txQueue[0]);
     // enqueue them onto the logs queue
-    m_txLogsQueue.PushBack(m_txQueue[0]);
+    m_txLogsQueue.push_back(m_txQueue[0]);
     // dequeue new message
-    m_txQueue.PopFront();
+    m_txQueue.pop_front();
   }
 }
 
@@ -210,10 +210,10 @@ void CanBus::processTxMessages() {
 void CanBus::processRxMessages() {
   static CANRxFrame rxMessageTmp;
   while (recv(rxMessageTmp)) {
-    m_rxQueue.PushBack(rxMessageTmp);
+    m_rxQueue.push_back(rxMessageTmp);
 
     // TODO: figure out a way to remove this duplication
-    m_rxLogsQueue.PushBack(rxMessageTmp);
+    m_rxLogsQueue.push_back(rxMessageTmp);
   }
 }
 
@@ -222,12 +222,12 @@ void CanBus::processRxMessages() {
  */
 void CanBus::printTxAll() {
   static CANTxFrame queueMessage;
-  queueMessage = m_txLogsQueue.PopFront();
+  queueMessage = m_txLogsQueue.pop_front();
   while (queueMessage.EID) {
     // print
     printTxMessage(queueMessage);
     // dequeue another message
-    queueMessage = m_txLogsQueue.PopFront();
+    queueMessage = m_txLogsQueue.pop_front();
   }
 }
 
@@ -236,34 +236,34 @@ void CanBus::printTxAll() {
  */
 void CanBus::printRxAll() {
   static CANRxFrame msg;
-  msg = m_rxLogsQueue.PopFront();
+  msg = m_rxLogsQueue.pop_front();
   while (msg.EID) {
     // print
     printRxMessage(msg);
     // dequeue another message
-    msg = m_rxLogsQueue.PopFront();
+    msg = m_rxLogsQueue.pop_front();
   }
 }
 
 /**
  * @desc Enqueues a packaged message to be transmitted over the CAN bus
  */
-void CanBus::queueTxMessage(CANTxFrame msg) { m_txQueue.PushBack(msg); }
+void CanBus::queueTxMessage(CANTxFrame msg) { m_txQueue.push_back(msg); }
 
 /**
  * @desc Dequeues a packaged message to be unpacked and used
  * @param msg The message at the front of the rx queue
  */
-CANRxFrame CanBus::dequeueRxMessage() { return m_rxQueue.PopFront(); }
+CANRxFrame CanBus::dequeueRxMessage() { return m_rxQueue.pop_front(); }
 
 /**
  * @desc Gets the current size of the tx queue
  * @return The size
  */
-uint8_t CanBus::txQueueSize() { return m_txQueue.Size(); }
+uint8_t CanBus::txQueueSize() const { return m_txQueue.size(); }
 
 /**
  * @desc Gets the current size of the rx queue
  * @return The size
  */
-uint8_t CanBus::rxQueueSize() { return m_rxQueue.Size(); }
+uint8_t CanBus::rxQueueSize() const { return m_rxQueue.size(); }

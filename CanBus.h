@@ -4,7 +4,7 @@
 
 #include <initializer_list>
 
-#include "CircularBuffer.h"
+#include "WPILib/circular_buffer.h"
 #include "hal.h"
 
 enum class CanBusBaudRate : uint8_t {
@@ -28,10 +28,10 @@ class CanBus {
 
   // queues a message to be transmitted
   void queueTxMessage(CANTxFrame msg);
-  uint8_t txQueueSize();
+  uint8_t txQueueSize() const;
   // dequeues a message received
   CANRxFrame dequeueRxMessage();
-  uint8_t rxQueueSize();
+  uint8_t rxQueueSize() const;
 
   // listen to CanBus bus and Enqueue/Dequeue messages accordingly
   void processTxMessages();
@@ -48,10 +48,10 @@ class CanBus {
 
  private:
   // circular buffers to hold CanBus_message_t instances
-  CircularBuffer<CANTxFrame> m_txQueue{10};
-  CircularBuffer<CANTxFrame> m_txLogsQueue{10};
-  CircularBuffer<CANRxFrame> m_rxQueue{10};
-  CircularBuffer<CANRxFrame> m_rxLogsQueue{10};
+  frc::circular_buffer<CANTxFrame> m_txQueue{10};
+  frc::circular_buffer<CANTxFrame> m_txLogsQueue{10};
+  frc::circular_buffer<CANRxFrame> m_rxQueue{10};
+  frc::circular_buffer<CANRxFrame> m_rxLogsQueue{10};
 
   uint32_t m_id = 0;
 

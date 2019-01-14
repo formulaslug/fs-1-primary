@@ -11,6 +11,7 @@ cppSrcFileInclude {
 modifiableFileExclude {
   ChibiOS/
   build/
+  wpi/
   StdLib\.cpp$
   StdLib\.h$
   chconf\.h$
@@ -18,4 +19,12 @@ modifiableFileExclude {
   mcuconfFs\.h$
   mcuconf\.h$
   mcuconf-f3\.h$
+}
+
+licenseUpdateExclude {
+  WPILib/
+}
+
+includeOtherLibs {
+  ^wpi/
 }
