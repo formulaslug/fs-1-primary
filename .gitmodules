@@ -1,0 +1,3 @@
+[submodule "chibios-subsys"]
+	path = chibios-subsys
+	url = git@github.com:mmwebster/chibios-subsys.git
