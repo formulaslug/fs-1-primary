@@ -15,8 +15,22 @@
 //       reverting all changes we introduced to try and diagnose the issue
 #include "chibios-subsys/subsystems/uart/Uart.h"
 
+// @TODO get from chibios-subsys instead
+#include "AdcChSubsys.h"
+
 //#include "chibios-subsys/common/CircularBuffer.h"
 //#include "chibios-subsys/common/Event.h"
+
+/**
+ * ADC subsystem thread
+ * @TODO Get rid of this once the ADC subsystem no longer requires a dedicated
+         thread to run (and is instead purely callback driven)
+ */
+static THD_WORKING_AREA(adcThreadFuncWa, 128);
+static THD_FUNCTION(adcThreadFunc, adcChSubsys) {
+  chRegSetThreadName("CAN RX HV");
+  static_cast<AdcChSubsys*>(adcChSubsys)->runThread();
+}
 
 int main() {
   /*
@@ -83,19 +97,38 @@ int main() {
   // create the UART interface and start using it
   cal::Uart uart = cal::Uart(UartInterface::kD3, fsmEventQueue);
 
+  // create the ADC interface and start using it
+  AdcChSubsys adcChSubsys = AdcChSubsys(fsmEventQueue);
+  // create its thread
+  chThdCreateStatic(adcThreadFuncWa, sizeof(adcThreadFuncWa), NORMALPRIO,
+                    adcThreadFunc, &adcChSubsys);
+  // start the ADC readings
+  adcChSubsys.addPin(Gpio::kA1);  // add brake input
+
   while (1) {
     // always deplete the queue to help ensure that events are
     // processed faster than they're generated
     while (fsmEventQueue.size() > 0) {
       Event e = fsmEventQueue.pop();
 
-      if (e.type() == Event::Type::kUartRx) {
-        char byte = e.getByte();
-        if (byte == '1') {
-          palTogglePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
-        }
-        // send received byte back to source (test throughput)
-        uart.send(byte);
+      switch (e.type()) {
+        case Event::Type::kUartRx:
+          {
+            char byte = e.getByte();
+            // test code
+            if (byte == '1') {
+              palTogglePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
+            }
+            // send UART byte back to labtop
+            uart.send(byte);
+          }
+          break;
+        case Event::Type::kAdcConversion:
+          {
+            uint32_t reading = e.adcValue();
+            uart.send(std::string("ADC reading:") + std::to_string(reading) + std::string("\r\n"));
+          }
+          break;
       }
     }
 
