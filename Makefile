@@ -86,7 +86,7 @@ endif
 PROJECT = fs-1-primary
 
 # Imported source files and paths
-CHIBIOS = ChibiOS
+CHIBIOS = chibios-subsys/ChibiOS
 # Startup files.
 # NOTE: Changed from startup_stm32f3xx.mk
 include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk
