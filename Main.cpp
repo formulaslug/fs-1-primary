@@ -3,12 +3,20 @@
 #include <array>
 #include <mutex>
 
-#include "Event.h"
-#include "EventQueue.h"
 #include "Vehicle.h"
 #include "ch.hpp"
 #include "hal.h"
-#include "mcuconfFs.h"
+#include "pinconf.h"
+
+// new chibios-subsystem wrapped includes
+// @note WARNING experienced very odd issue with the UART abstraction where it
+//       seemed to break the RT kernel when we created a vector inside
+//       CircularBuffer.h/inc. Then it magically started working again after
+//       reverting all changes we introduced to try and diagnose the issue
+#include "chibios-subsys/subsystems/uart/Uart.h"
+
+//#include "chibios-subsys/common/CircularBuffer.h"
+//#include "chibios-subsys/common/Event.h"
 
 int main() {
   /*
@@ -23,8 +31,57 @@ int main() {
 
   // @TODO Set UART input modes (eventually should be done inside of the UART
   //       abstraction)
+  palSetPadMode(GPIOC, 10, PAL_MODE_ALTERNATE(7)); // USART3_TX
+  palSetPadMode(GPIOC, 11, PAL_MODE_ALTERNATE(7)); // USART3_RX
 
   EventQueue fsmEventQueue = EventQueue();
+
+  // CAN (Put this inside the abstraction)
+  palSetPadMode(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);
+  palSetPadMode(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN,
+      PAL_MODE_OUTPUT_PUSHPULL);
+
+  // MISC I/O init
+  palSetPadMode(DRIVE_BUTTON_PORT, DRIVE_BUTTON_PIN,
+                PAL_MODE_INPUT_PULLUP);  // AMS
+  palSetPadMode(DRIVE_MODE_BUTTON_PORT, DRIVE_MODE_BUTTON_PIN,
+                PAL_MODE_INPUT_PULLUP);  // BSPD
+  palSetPadMode(BSPD_FAULT_PORT, BSPD_FAULT_PIN,
+                PAL_MODE_INPUT_PULLUP);  // RTDS signal
+  // Digital outputs
+  palSetPadMode(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
+                PAL_MODE_OUTPUT_PUSHPULL);  // IMD
+  palSetPadMode(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
+                PAL_MODE_OUTPUT_PUSHPULL);  // AMS
+  palSetPadMode(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN,
+                PAL_MODE_OUTPUT_PUSHPULL);  // BSPD
+  palSetPadMode(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN,
+                PAL_MODE_OUTPUT_PUSHPULL);  // RTDS signal
+  palSetPadMode(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN,
+                PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
+  palSetPadMode(STARTUP_LED_PORT, STARTUP_LED_PIN,
+                PAL_MODE_OUTPUT_PUSHPULL);  // Brake light signal
+
+  // clear all dig outputs
+  palClearPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);
+  palClearPad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN);
+  palClearPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);
+  palClearPad(STARTUP_SOUND_PORT, STARTUP_SOUND_PIN);
+  palClearPad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
+  palClearPad(STARTUP_LED_PORT, STARTUP_LED_PIN);
+
+
+  // set some of them
+  palSetPad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN);
+  palSetPad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN);
+  palSetPad(BSPD_FAULT_INDICATOR_PORT, BSPD_FAULT_INDICATOR_PIN);
+  palClearPad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
+  palSetPad(CAN2_STATUS_LED_PORT, CAN2_STATUS_LED_PIN);
+  palSetPad(CAN1_STATUS_LED_PORT, CAN1_STATUS_LED_PIN);
+
+  // create the UART interface and start using it
+  cal::Uart uart = cal::Uart(UartInterface::kD3, fsmEventQueue);
 
   while (1) {
     // always deplete the queue to help ensure that events are
@@ -32,8 +89,13 @@ int main() {
     while (fsmEventQueue.size() > 0) {
       Event e = fsmEventQueue.pop();
 
-      if (e.type() == Event::Type::kDigInTransition) {
-        // ...
+      if (e.type() == Event::Type::kUartRx) {
+        char byte = e.getByte();
+        if (byte == '1') {
+          palTogglePad(BRAKE_LIGHT_PORT, BRAKE_LIGHT_PIN);
+        }
+        // send received byte back to source (test throughput)
+        uart.send(byte);
       }
     }
 

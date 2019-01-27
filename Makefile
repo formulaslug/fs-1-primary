@@ -120,7 +120,13 @@ CSRC = $(STARTUPSRC) \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
+CHIBIOS_SUBSYS_UART = chibios-subsys
+CHIBIOS_SUBSYS_COMMON = chibios-subsys/common
 CPPSRC = $(CHCPPSRC) \
+         $(wildcard $(CHIBIOS_SUBSYS_UART)/subsystems/uart/*.cpp) \
+         $(wildcard $(CHIBIOS_SUBSYS_UART)/subsystems/uart/*.hpp) \
+         $(wildcard $(CHIBIOS_SUBSYS_COMMON)/*.cpp) \
+         $(wildcard $(CHIBIOS_SUBSYS_COMMON)/*.hpp) \
          $(wildcard *.cpp) \
          $(wildcard *.hpp)
 

@@ -15,7 +15,7 @@ modifiableFileExclude {
   StdLib\.h$
   chconf\.h$
   halconf\.h$
-  mcuconfFs\.h$
+  pinconf\.h$
   mcuconf\.h$
   mcuconf-f3\.h$
 }
