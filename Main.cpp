@@ -118,7 +118,7 @@ static THD_FUNCTION(canRxHvThreadFunc, canChSubsys) {
  */
 static THD_WORKING_AREA(adcThreadFuncWa, 128);
 static THD_FUNCTION(adcThreadFunc, adcChSubsys) {
-  chRegSetThreadName("CAN RX HV");
+  chRegSetThreadName("ADC");
   static_cast<AdcChSubsys*>(adcChSubsys)->runThread();
 }
 
@@ -127,7 +127,7 @@ static THD_FUNCTION(adcThreadFunc, adcChSubsys) {
  */
 static THD_WORKING_AREA(digInThreadFuncWa, 128);
 static THD_FUNCTION(digInThreadFunc, digInChSubsys) {
-  chRegSetThreadName("CAN RX HV");
+  chRegSetThreadName("DIGITAL IN");
   static_cast<DigInChSubsys*>(digInChSubsys)->runThread();
 }
 
@@ -190,7 +190,7 @@ int main() {
   chibios_rt::Mutex canBusHvMut;
 
   // Indicate startup - blink then stay on
-  for (uint8_t i = 0; i < 2; i++) {
+  for (uint8_t i = 0; i < 5; i++) {
     palWritePad(IMD_FAULT_INDICATOR_PORT, IMD_FAULT_INDICATOR_PIN,
                 PAL_HIGH);  // IMD
     palWritePad(AMS_FAULT_INDICATOR_PORT, AMS_FAULT_INDICATOR_PIN,
