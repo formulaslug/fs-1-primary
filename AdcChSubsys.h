@@ -23,7 +23,6 @@
 class AdcChSubsys {
  public:
   explicit AdcChSubsys(EventQueue& eq);
-  ~AdcChSubsys();
 
   /**
    * Add a pin to the subsystem and start generating conversion events

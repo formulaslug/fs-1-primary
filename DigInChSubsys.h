@@ -30,7 +30,6 @@
 class DigInChSubsys {
  public:
   explicit DigInChSubsys(EventQueue& eq);
-  ~DigInChSubsys();
 
   /**
    * Add a pin to the subsystem and start generating transition events

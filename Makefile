@@ -5,37 +5,32 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O2 -ggdb -flto -fomit-frame-pointer -falign-functions=16
+  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16
 endif
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT =
+  USE_COPT = 
 endif
 
 # C++ specific options here (added to USE_OPT).
 ifeq ($(USE_CPPOPT),)
-  USE_CPPOPT = -fno-exceptions -fno-rtti -std=c++1z
+  USE_CPPOPT = -fno-rtti
 endif
 
-# Enable this if you want the linker to remove unused code and data
+# Enable this if you want the linker to remove unused code and data.
 ifeq ($(USE_LINK_GC),)
   USE_LINK_GC = yes
 endif
 
 # Linker extra options here.
 ifeq ($(USE_LDOPT),)
-  USE_LDOPT =
+  USE_LDOPT = 
 endif
 
-# Enable this if you want link time optimizations (LTO)
+# Enable this if you want link time optimizations (LTO).
 ifeq ($(USE_LTO),)
   USE_LTO = yes
-endif
-
-# If enabled, this option allows to compile the application in THUMB mode.
-ifeq ($(USE_THUMB),)
-  USE_THUMB = yes
 endif
 
 # Enable this if you want to see the full log while compiling.
@@ -71,7 +66,12 @@ endif
 
 # Enables the use of FPU (no, softfp, hard).
 ifeq ($(USE_FPU),)
-  USE_FPU = no
+  USE_FPU = hard
+endif
+
+# FPU-related options.
+ifeq ($(USE_FPU_OPT),)
+  USE_FPU_OPT = -mfloat-abi=$(USE_FPU) -mfpu=fpv4-sp-d16
 endif
 
 #
@@ -86,8 +86,11 @@ endif
 PROJECT = fs-1-primary
 
 # Imported source files and paths
-CHIBIOS = ChibiOS
+CHIBIOS := ChibiOS
+CONFDIR := ./cfg
+
 # Startup files.
+include $(CHIBIOS)/os/license/license.mk
 # NOTE: Changed from startup_stm32f3xx.mk
 include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk
 # HAL-OSAL files (optional).
@@ -101,6 +104,7 @@ include $(CHIBIOS)/os/rt/rt.mk
 include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 # Other files (optional).
 include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
+include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 
 # Define linker script file here
 # NOTE: Changed from STM32F303x8.ld
@@ -108,51 +112,28 @@ LDSCRIPT= $(STARTUPLD)/STM32F407xG.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CSRC = $(STARTUPSRC) \
-       $(KERNSRC) \
-       $(PORTSRC) \
-       $(OSALSRC) \
-       $(HALSRC) \
-       $(PLATFORMSRC) \
-       $(BOARDSRC) \
-       $(CHIBIOS)/os/hal/lib/streams/memstreams.c \
-       $(CHIBIOS)/os/hal/lib/streams/chprintf.c
+CSRC = $(ALLCSRC)
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CPPSRC = $(CHCPPSRC) \
+CPPSRC = $(ALLCPPSRC) \
          $(wildcard *.cpp) \
          $(wildcard *.hpp)
 
-# C sources to be compiled in ARM mode regardless of the global setting.
-# NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
-#       option that results in lower performance and larger code size.
-ACSRC =
+# List ASM source files here.
+ASMSRC = $(ALLASMSRC)
 
-# C++ sources to be compiled in ARM mode regardless of the global setting.
-# NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
-#       option that results in lower performance and larger code size.
-ACPPSRC =
+# List ASM with preprocessor source files here.
+ASMXSRC = $(ALLXASMSRC)
 
-# C sources to be compiled in THUMB mode regardless of the global setting.
-# NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
-#       option that results in lower performance and larger code size.
-TCSRC =
+# Inclusion directories.
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC)
 
-# C sources to be compiled in THUMB mode regardless of the global setting.
-# NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
-#       option that results in lower performance and larger code size.
-TCPPSRC =
+# Define C warning options here.
+CWARN = -Wall -Wextra -Wundef -Wstrict-prototypes
 
-# List ASM source files here
-ASMSRC =
-ASMXSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
-
-INCDIR = $(CHIBIOS)/os/license \
-         $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
-         $(HALINC) $(PLATFORMINC) $(BOARDINC) $(CHCPPINC) \
-         $(CHIBIOS)/os/hal/lib/streams \
-         $(CHIBIOS)/os/various
+# Define C++ warning options here.
+CPPWARN = -Wall -Wextra -Wundef
 
 #
 # Project, sources and paths
@@ -220,7 +201,7 @@ ULIBS = -lm -lrdimon
 # End of user defines
 ##############################################################################
 
-RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
+RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk
 include $(RULESPATH)/rules.mk
 
 .PHONY: upload
