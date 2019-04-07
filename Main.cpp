@@ -44,50 +44,10 @@ double normalize(const std::array<double, 2> range, double input) {
   return (input - range[0]) / (range[1] - range[0]);
 }
 
-/**
- * @desc Performs period tasks every second for HV CAN bus
- */
-static THD_WORKING_AREA(heartbeatHvThreadFuncWa, 128);
-static THD_FUNCTION(heartbeatHvThreadFunc, canChSubsys) {
-  chRegSetThreadName("NODE HEARTBEAT HV");
 
-  while (1) {
-    HeartbeatMessage heartbeatMessage(0x1);
-    static_cast<CanChSubsys*>(canChSubsys)->startSend(heartbeatMessage);
-    chThdSleepMilliseconds(1000);
-  }
-}
 
 /**
- * @desc Performs period tasks every second for LV CAN bus
- */
-static THD_WORKING_AREA(heartbeatLvThreadFuncWa, 128);
-static THD_FUNCTION(heartbeatLvThreadFunc, canChSubsys) {
-  chRegSetThreadName("NODE HEARTBEAT LV");
-
-  while (1) {
-    HeartbeatMessage heartbeatMessage(0x1);
-    static_cast<CanChSubsys*>(canChSubsys)->startSend(heartbeatMessage);
-    chThdSleepMilliseconds(1000);
-  }
-}
-
-/**
- * @desc Performs period tasks every second
- */
-// static THD_WORKING_AREA(throttleThreadFuncWa, 128);
-// static THD_FUNCTION(throttleThreadFunc, canChSubsys) {
-//   chRegSetThreadName("THROTTLE");
-//
-//   while (1) {
-//     ThrottleMessage throttleMessage(1);
-//     static_cast<CanChSubsys*>(canChSubsys)->startSend(throttleMessage);
-//     chThdSleepMilliseconds(200);
-//   }
-// }
-
-/**
- * CAN TX/RX, LV/HV subsystem threads
+ * Start Subsystem Threads
  */
 static THD_WORKING_AREA(canTxLvThreadFuncWa, 128);
 static THD_FUNCTION(canTxLvThreadFunc, canChSubsys) {
@@ -113,18 +73,12 @@ static THD_FUNCTION(canRxHvThreadFunc, canChSubsys) {
   static_cast<CanChSubsys*>(canChSubsys)->runRxThread();
 }
 
-/**
- * ADC subsystem thread
- */
 static THD_WORKING_AREA(adcThreadFuncWa, 128);
 static THD_FUNCTION(adcThreadFunc, adcChSubsys) {
   chRegSetThreadName("ADC");
   static_cast<AdcChSubsys*>(adcChSubsys)->runThread();
 }
 
-/**
- * Digital Input subsystem thread
- */
 static THD_WORKING_AREA(digInThreadFuncWa, 128);
 static THD_FUNCTION(digInThreadFunc, digInChSubsys) {
   chRegSetThreadName("DIGITAL IN");
@@ -132,13 +86,7 @@ static THD_FUNCTION(digInThreadFunc, digInChSubsys) {
 }
 
 int main() {
-  /*
-   * System initializations.
-   * - HAL initialization, this also initializes the configured device drivers
-   *   and performs the board-specific initializations.
-   * - Kernel initialization, the main() function becomes a thread and the
-   *   RTOS is active.
-   */
+
   halInit();
   chSysInit();
 
@@ -236,10 +184,6 @@ int main() {
                     NORMALPRIO, canRxLvThreadFunc, &canLvChSubsys);
   chThdCreateStatic(canTxLvThreadFuncWa, sizeof(canTxLvThreadFuncWa),
                     NORMALPRIO + 1, canTxLvThreadFunc, &canLvChSubsys);
-  chThdCreateStatic(heartbeatLvThreadFuncWa, sizeof(heartbeatLvThreadFuncWa),
-                    NORMALPRIO, heartbeatLvThreadFunc, &canLvChSubsys);
-  chThdCreateStatic(heartbeatHvThreadFuncWa, sizeof(heartbeatHvThreadFuncWa),
-                    NORMALPRIO, heartbeatHvThreadFunc, &canHvChSubsys);
   chThdCreateStatic(canTxHvThreadFuncWa, sizeof(canTxHvThreadFuncWa),
                     NORMALPRIO + 1, canTxHvThreadFunc, &canHvChSubsys);
   chThdCreateStatic(canRxHvThreadFuncWa, sizeof(canRxHvThreadFuncWa),
